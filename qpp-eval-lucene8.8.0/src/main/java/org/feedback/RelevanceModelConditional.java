@@ -32,7 +32,7 @@ public class RelevanceModelConditional extends RelevanceModelIId {
         int docsSeen = 0;
 
         // For each doc in top ranked
-        for (PerDocTermVector docvec : this.retrievedDocsTermStats.docTermVecs) {            
+        for (PerDocTermVector docvec : this.retrievedDocsTermStats.docTermVecs) {   
             // For each word in this document
             for (Map.Entry<String, RetrievedDocTermInfo> e : docvec.perDocStats.entrySet()) {
                 RetrievedDocTermInfo w = e.getValue();

@@ -404,12 +404,12 @@ public class QPPEvaluator {
         QPPMethod[] qppMethods = {
 //                new BaseIDFSpecificity(searcher),
                 new AvgIDFSpecificity(searcher),
-                new NQCSpecificity(searcher),
-                new ClaritySpecificity(searcher),
+                new NQCSpecificity(searcher),                
                 new WIGSpecificity(searcher),
+                new ClaritySpecificity(searcher),
                 new UEFSpecificity(new NQCSpecificity(searcher)),
-                new UEFSpecificity(new ClaritySpecificity(searcher)),
                 new UEFSpecificity(new WIGSpecificity(searcher)),
+                new UEFSpecificity(new ClaritySpecificity(searcher)),
         };
         return qppMethods;
     }

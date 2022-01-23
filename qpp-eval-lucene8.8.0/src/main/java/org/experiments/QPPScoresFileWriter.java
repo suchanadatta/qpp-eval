@@ -34,7 +34,7 @@ public class QPPScoresFileWriter {
         }
 
         final String queryFile = "/store/query/trec-robust.xml";
-        final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene5.3.1/outputs/lm-dir.res";
+        final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene8.8.0/outputs/lm-dir.res";
         final String qrelsFile = "/store/qrels/trec-robust.qrel";
 
         try {
@@ -60,7 +60,7 @@ public class QPPScoresFileWriter {
            
             Evaluator evaluator = qppEvaluator.executeQueries(queries, sim, nwanted, qrelsFile, resFile, topDocsMap);
 
-            FileWriter fw = new FileWriter("/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene5.3.1/outputs/lm-dir.qpp");
+            FileWriter fw = new FileWriter("/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene8.8.0/outputs/lm-dir.qpp");
             BufferedWriter bw = new BufferedWriter(fw);
             StringBuilder buff = new StringBuilder();
             buff.append("QID\t");
@@ -78,7 +78,6 @@ public class QPPScoresFileWriter {
                 for (QPPMethod qppMethod: qppMethods) {
                     System.out.println(String.format("computing %s scores for qid %s", qppMethod.name(), query.id));
                     RetrievedResults rr = evaluator.getRetrievedResultsForQueryId(query.id);
-//                    System.out.println("RR : " + rr.toString());
                     TopDocs topDocs = topDocsMap.get(query.title);
                     if (topDocs==null) {
                         System.err.println("No Topdocs found for query <" + query.title + ">");
