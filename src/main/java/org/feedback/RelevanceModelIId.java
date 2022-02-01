@@ -138,7 +138,12 @@ public class RelevanceModelIId {
 
         // Sort the scoredocs in ascending order of the KL-Div scores
         Arrays.sort(klDivScoreDocs, new KLDivScoreComparator());
+        //+++LUCENE_COMPATIBILITY: Sad there's no #ifdef like C!
+        // 8.x CODE
         TopDocs rerankedDocs = new TopDocs(topDocs.totalHits, klDivScoreDocs);
+        // 5.x CODE
+        //TopDocs rerankedDocs = new TopDocs(topDocs.totalHits, klDivScoreDocs, klDivScoreDocs[0].score);
+        //---LUCENE_COMPATIBILITY
         return rerankedDocs;
     }
 

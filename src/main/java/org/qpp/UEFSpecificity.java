@@ -69,7 +69,12 @@ public class UEFSpecificity implements QPPMethod {
         List<ScoreDoc> sdList = new ArrayList(Arrays.asList(topDocs.scoreDocs));
         Collections.shuffle(sdList, rnd);
         sampledScoreDocs = sdList.subList(0, Math.min(topDocs.scoreDocs.length, k)).toArray(sampledScoreDocs);
+        //+++LUCENE_COMPATIBILITY: Sad there's no #ifdef like C!
+        // 8.x CODE
         return new TopDocs(new TotalHits(k, TotalHits.Relation.EQUAL_TO), sampledScoreDocs);
+        // 5.x code
+        //return new TopDocs(Math.min(topDocs.scoreDocs.length, k), sampledScoreDocs, SEED);
+        //---LUCENE_COMPATIBILITY
     }
 
     @Override

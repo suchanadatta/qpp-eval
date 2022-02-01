@@ -54,7 +54,12 @@ public class TRECQuery {
     
     public Set<Term> getQueryTerms(IndexSearcher searcher) throws IOException {
         Set<Term> terms = new HashSet<>();
+        //+++LUCENE_COMPATIBILITY: Sad there's no #ifdef like C!
+        // 8.x CODE
         luceneQuery.createWeight(searcher, ScoreMode.COMPLETE, 1).extractTerms(terms);
+        // 5.x code
+        //luceneQuery.createWeight(searcher, false).extractTerms(terms);
+        //---LUCENE_COMPATIBILITY
         return terms;
     }
 }

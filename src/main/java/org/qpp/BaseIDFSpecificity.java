@@ -36,7 +36,13 @@ public class BaseIDFSpecificity implements QPPMethod {
     double maxIDF(Query q) throws IOException {
         long N = reader.numDocs();
         Set<Term> qterms = new HashSet<>();
+
+        //+++LUCENE_COMPATIBILITY: Sad there's no #ifdef like C!
+        // 8.x CODE
         q.createWeight(searcher, ScoreMode.COMPLETE, 1).extractTerms(qterms);
+        // 5.x CODE
+        //q.createWeight(searcher, false).extractTerms(qterms);
+        //---LUCENE_COMPATIBILITY
 
         double aggregated_idf = 0;
         for (Term t: qterms) {
