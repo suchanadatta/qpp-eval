@@ -1,6 +1,5 @@
 package org.regressor;
 
-import java.util.Arrays;
 import org.apache.commons.math3.fitting.PolynomialCurveFitter;
 import org.apache.commons.math3.fitting.WeightedObservedPoints;
 import org.correlation.MinMaxNormalizer;
@@ -29,7 +28,6 @@ public class FitPolyRegressor {
         }
         fitter = PolynomialCurveFitter.create(degree);
         coeff = fitter.fit(obs.toList());
-        System.out.println("Coefficients :::: " + Arrays.toString(coeff));
         return coeff;
     }
 }

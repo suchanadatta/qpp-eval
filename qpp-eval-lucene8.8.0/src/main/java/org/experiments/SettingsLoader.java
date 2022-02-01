@@ -11,6 +11,7 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.FSDirectory;
 import org.correlation.*;
+import org.evaluator.Metric;
 import org.qpp.*;
 
 
@@ -18,9 +19,11 @@ public class SettingsLoader {
 
     static Map<String, QPPCorrelationMetric> corrMetrics;
     static Map<String, QPPMethod>            qppMethods;
+    static Map<String, Metric>            retEvalMetrics;
+
     static int                               qppTopK;
     boolean                                  boolIndexExists;
-    Properties                               prop;
+    static Properties                               prop;
     IndexReader                              reader;
     IndexSearcher                            searcher;
     int                                      numWanted;
@@ -29,11 +32,11 @@ public class SettingsLoader {
     String                                   qrelsFile;
     static boolean initialized = false;
     
-    
-
     static void init(Properties prop, IndexSearcher searcher) {
         if (initialized)
             return;
+
+        SettingsLoader.prop = prop;
 
         corrMetrics = new HashMap<>();
         corrMetrics.put("r", new PearsonCorrelation());
@@ -45,10 +48,14 @@ public class SettingsLoader {
         corrMetrics.put("classacc", new QuantizedClassAccuracy(Integer.parseInt(prop.getProperty("qsim.numintervals", "5"))));
         corrMetrics.put("rmse", new RmseCorrelation());
 
+        retEvalMetrics = new HashMap<>();
+        retEvalMetrics.put("ap", Metric.AP);
+        retEvalMetrics.put("p_10", Metric.AP);
+        retEvalMetrics.put("recall", Metric.AP);
+        retEvalMetrics.put("ndcg", Metric.AP);
+
         qppMethods = new HashMap<>();
-//        qppMethodsRerank = new HashMap<>();
         qppMethods.put("avgidf", new AvgIDFSpecificity(searcher));
-//        qppMethods.put("maxidf", new BaseIDFSpecificity(searcher));
         qppMethods.put("nqc", new NQCSpecificity(searcher));
         qppMethods.put("wig", new WIGSpecificity(searcher));
         qppMethods.put("clarity", new ClaritySpecificity(searcher));
@@ -56,10 +63,7 @@ public class SettingsLoader {
         qppMethods.put("uef_wig", new UEFSpecificity(new WIGSpecificity(searcher)));
         qppMethods.put("uef_clarity", new UEFSpecificity(new ClaritySpecificity(searcher)));
         
-        System.out.println("QPP Methods : " + qppMethods.keySet());
-
         qppTopK = Integer.parseInt(prop.getProperty("qpp.numtopdocs"));
-        System.out.println("QPP top k : " + qppTopK);
 
         initialized = true;
     }
@@ -74,7 +78,6 @@ public class SettingsLoader {
         reader = DirectoryReader.open(FSDirectory.open(indexDir.toPath()));
         searcher = new IndexSearcher(reader);
         numWanted = Integer.parseInt(prop.getProperty("retrieve.num_wanted", "100"));
-        
 
         init(prop, searcher);
     }
@@ -99,5 +102,9 @@ public class SettingsLoader {
     public int getTrainTestSplits() {
         int splits = Integer.parseInt(prop.getProperty("qpp.splits"));
         return splits;
+    }
+
+    public static Metric getRetEvalMetric() {
+        return retEvalMetrics.get(prop.getProperty("reteval.metric"));
     }
 }

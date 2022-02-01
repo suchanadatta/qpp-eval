@@ -188,7 +188,6 @@ class AllRetrievedResults {
         RetrievedResults rr = allRetMap.get(qid);
         switch (m) {
             case AP: res = rr.computeAP(); break;
-//            case P_5: res = rr.precAtTop(5); break;
             case P_10: res = rr.precAtTop(10); break;
             case Recall: res = rr.computeRecall(); break;
             case nDCG: res = rr.computeNdcg();

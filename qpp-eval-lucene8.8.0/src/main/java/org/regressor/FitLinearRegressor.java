@@ -29,13 +29,11 @@ public class FitLinearRegressor {
         }
     }
     
-    public double learnSlope() {
-        System.out.println("SLOPE : " + re.getSlope());
+    public double getSlope() {
         return re.getSlope();
     }
     
-    public double learnIntercept() {
-        System.out.println("INTERCEPT : " + re.getIntercept());
+    public double getIntercept() {
         return re.getIntercept();
     }
 }

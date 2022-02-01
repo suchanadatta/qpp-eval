@@ -144,9 +144,7 @@ public class QPPEvaluator {
         BufferedWriter bw = new BufferedWriter(fw);
 
         for (TRECQuery query : queries) {
-//            System.out.println("current query : " + query.luceneQuery);
             TopDocs topDocs = retrieve(query, sim, cutoff);
-//            System.out.println("no. of docs retrieved : " + topDocs.totalHits);
             if (topDocsMap != null)
                 topDocsMap.put(query.title, topDocs);
             saveRetrievedTuples(bw, query, topDocs, sim.toString());
@@ -164,7 +162,6 @@ public class QPPEvaluator {
         topDocsMap = new HashMap<>();
 
         int numQueries = queries.size();
-        System.out.println("Num queries : " + numQueries);
         double[] evaluatedMetricValues = new double[numQueries];
 
         final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene8.8.0/data/sample.res";
@@ -172,9 +169,7 @@ public class QPPEvaluator {
         BufferedWriter bw = new BufferedWriter(fw);
 
         for (TRECQuery query : queries) {
-//            System.out.println(query.id + " : " + query.title);
             TopDocs topDocs = retrieve(query, sim, cutoff);
-//            System.out.println("Retrieved docs : " + topDocs.totalHits);
             topDocsMap.put(query.title, topDocs);
             saveRetrievedTuples(bw, query, topDocs, sim.toString());
         }
@@ -196,17 +191,13 @@ public class QPPEvaluator {
         topDocsMap = new HashMap<>();
 
         int numQueries = queries.size();
-        System.out.println("Num queries : " + numQueries);
         double[] evaluatedMetricValues = new double[numQueries];
 
-//        final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene5.3.1/data/sample.res";
         FileWriter fw = new FileWriter(resFile);
         BufferedWriter bw = new BufferedWriter(fw);
 
         for (TRECQuery query : queries) {
-//            System.out.println(query.id + " : " + query.title);
             TopDocs topDocs = retrieve(query, sim, cutoff);
-//            System.out.println("Retrieved docs : " + topDocs.totalHits);
             topDocsMap.put(query.title, topDocs);
             saveRetrievedTuples(bw, query, topDocs, sim.toString());
         }
@@ -232,7 +223,6 @@ public class QPPEvaluator {
         topDocsMap = new HashMap<>();
 
         int numQueries = queries.size();
-        System.out.println("Num queries : " + numQueries);
         Map<String, Double> evaluatedMetricValues = new HashMap<>();
 
         final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene8.8.0/data/sample.res";
@@ -240,9 +230,7 @@ public class QPPEvaluator {
         BufferedWriter bw = new BufferedWriter(fw);
 
         for (TRECQuery query : queries) {
-//            System.out.println(query.id + " : " + query.title);
             TopDocs topDocs = retrieve(query, sim, cutoff);
-//            System.out.println("Retrieved docs : " + topDocs.totalHits);
             topDocsMap.put(query.title, topDocs);
             saveRetrievedTuples(bw, query, topDocs, sim.toString());
         }
@@ -265,17 +253,13 @@ public class QPPEvaluator {
         topDocsMap = new HashMap<>();
 
         int numQueries = queries.size();
-        System.out.println("Num queries : " + numQueries);
         Map<String, Double> evaluatedMetricValues = new HashMap<>();
 
-//        final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene5.3.1/data/sample.res";
         FileWriter fw = new FileWriter(resFile);
         BufferedWriter bw = new BufferedWriter(fw);
 
         for (TRECQuery query : queries) {
-//            System.out.println(query.id + " : " + query.title);
             TopDocs topDocs = retrieve(query, sim, cutoff);
-//            System.out.println("Retrieved docs : " + topDocs.totalHits);
             topDocsMap.put(query.title, topDocs);
             saveRetrievedTuples(bw, query, topDocs, sim.toString());
         }
@@ -371,12 +355,12 @@ public class QPPEvaluator {
         
         return correlationMetric.correlation(evaluatedMetricValues, qppEstimates);
     }
-    
+
+    /* Returns a map of qid :-> ret_eval_value (e.g. AP value) */
     public Map<String, Double> evaluateQPPOnModel(
             QPPMethod qppMethod, List<TRECQuery> queries, 
             Map<String, Double> evaluatedMetricValues, Metric m, String resFile) throws Exception {
         
-//        final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene5.3.1/data/sample.res";
         Map<String, Double> qppEstimates = new HashMap<>();
         int qppTopK = Integer.parseInt(prop.getProperty("qpp.numtopdocs"));
         String qrelsFile = prop.getProperty("qrels.file");
@@ -396,7 +380,6 @@ public class QPPEvaluator {
     }
     
     public double measureCorrelation (Map<String, Double> evaluatedMetricValues, Map<String, Double> qppEstimates) {
-        System.out.print("Correlation Coefficient : " + correlationMetric.name() + " --- ");
         return correlationMetric.correlation(evaluatedMetricValues, qppEstimates);
     }
     
@@ -404,12 +387,12 @@ public class QPPEvaluator {
         QPPMethod[] qppMethods = {
 //                new BaseIDFSpecificity(searcher),
                 new AvgIDFSpecificity(searcher),
-                new NQCSpecificity(searcher),                
-                new WIGSpecificity(searcher),
+                new NQCSpecificity(searcher),
                 new ClaritySpecificity(searcher),
+                new WIGSpecificity(searcher),
                 new UEFSpecificity(new NQCSpecificity(searcher)),
-                new UEFSpecificity(new WIGSpecificity(searcher)),
                 new UEFSpecificity(new ClaritySpecificity(searcher)),
+                new UEFSpecificity(new WIGSpecificity(searcher)),
         };
         return qppMethods;
     }
