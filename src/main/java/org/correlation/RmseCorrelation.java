@@ -19,31 +19,20 @@ public class RmseCorrelation implements QPPCorrelationMetric {
     
     @Override
     public double correlation(double[] gt, double[] pred) {
-        double[] n_gt = MinMaxNormalizer.normalize(gt); // in [0, 1]
-        double[] n_pred = MinMaxNormalizer.normalize(pred); // in [0, 1]
-
-        return rmse(n_gt, n_pred);
+        return rmse(gt, pred);
     }
 
-    public double rmse(double[] truth, double[] pred) {
-        double rmse = 0;        
+    private double rmse(double[] truth, double[] pred) {
+        double rmse = 0;
+        StringBuffer buff = new StringBuffer("pairs: ");
         for(int i=0; i < truth.length; i++) {
+            buff.append(String.format("(%.4f, %.4f) ", pred[i], truth[i]));
             rmse += Math.pow(pred[i] - truth[i], 2);
-        }        
+        }
+        System.out.println(buff.toString());
         return (double)Math.sqrt(rmse/(double)truth.length);
     }
     
-    @Override
-    public double correlation(Map<String, Double> gt, Map<String, Double> pred) {
-        List<Double> gtValues = new ArrayList<>(gt.values());
-        double[] gtArr = gtValues.stream().mapToDouble(Double::doubleValue).toArray();
-        
-        List<Double> predValues = new ArrayList<>(pred.values());
-        double[] predArr = predValues.stream().mapToDouble(Double::doubleValue).toArray();
-        
-        return rmse(gtArr, predArr);
-    }
-
     @Override
     public String name() {
         return "rmse";

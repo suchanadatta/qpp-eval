@@ -37,8 +37,6 @@ public class MinMaxNormalizer {
         for (Map.Entry<String, Double> entry : x.entrySet()) {
             x.put(entry.getKey(), (entry.getValue()-min)/diff);
         }
-        
-//        System.out.println("normalized values : " + x);
         return x;
     }
 }

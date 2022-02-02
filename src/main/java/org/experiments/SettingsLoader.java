@@ -9,6 +9,10 @@ import java.util.Properties;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.similarities.BM25Similarity;
+import org.apache.lucene.search.similarities.LMDirichletSimilarity;
+import org.apache.lucene.search.similarities.LMJelinekMercerSimilarity;
+import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.store.FSDirectory;
 import org.correlation.*;
 import org.evaluator.Metric;
@@ -19,87 +23,95 @@ public class SettingsLoader {
 
     static Map<String, QPPCorrelationMetric> corrMetrics;
     static Map<String, QPPMethod>            qppMethods;
-    static Map<String, Metric>            retEvalMetrics;
+    static Map<String, Metric>               retEvalMetrics;
 
     static int                               qppTopK;
-    boolean                                  boolIndexExists;
-    static Properties                               prop;
-    IndexReader                              reader;
-    IndexSearcher                            searcher;
-    int                                      numWanted;
-    String                                   queryFile;
-    String                                   resFile;
-    String                                   qrelsFile;
+    static boolean                           boolIndexExists;
+    static Properties                        prop;
+    static IndexReader                       reader;
+    static IndexSearcher                     searcher;
+    static int                               numWanted;
+    static String                            queryFile;
+    static int                               trainPercent;
+    static String                            qrelsFile;
     static boolean initialized = false;
+    static Map<String, Similarity> retModelMap = new HashMap<>(3);
     
-    static void init(Properties prop, IndexSearcher searcher) {
+    static void init(String propFile) {
         if (initialized)
             return;
 
-        SettingsLoader.prop = prop;
+        try {
+            prop = new Properties();
+            prop.load(new FileReader(propFile));
 
-        corrMetrics = new HashMap<>();
-        corrMetrics.put("r", new PearsonCorrelation());
-        corrMetrics.put("rho", new SpearmanCorrelation());
-        corrMetrics.put("tau", new KendalCorrelation());
-        corrMetrics.put("qsim", new QuantizedSimCorrelation(Integer.parseInt(prop.getProperty("qsim.numintervals", "5"))));
-        corrMetrics.put("qsim_strict", new QuantizedStrictMatchCorrelation(Integer.parseInt(prop.getProperty("qsim.numintervals", "5"))));
-        corrMetrics.put("pairacc", new PairwiseAccuracyMetric());
-        corrMetrics.put("classacc", new QuantizedClassAccuracy(Integer.parseInt(prop.getProperty("qsim.numintervals", "5"))));
-        corrMetrics.put("rmse", new RmseCorrelation());
+            File indexDir = new File(prop.getProperty("index.dir"));
+            System.out.println("Running queries against index: " + indexDir.getPath());
 
-        retEvalMetrics = new HashMap<>();
-        retEvalMetrics.put("ap", Metric.AP);
-        retEvalMetrics.put("p_10", Metric.AP);
-        retEvalMetrics.put("recall", Metric.AP);
-        retEvalMetrics.put("ndcg", Metric.AP);
+            reader = DirectoryReader.open(FSDirectory.open(indexDir.toPath()));
+            searcher = new IndexSearcher(reader);
+            numWanted = Integer.parseInt(prop.getProperty("retrieve.num_wanted", "100"));
 
-        qppMethods = new HashMap<>();
-        qppMethods.put("avgidf", new AvgIDFSpecificity(searcher));
-        qppMethods.put("nqc", new NQCSpecificity(searcher));
-        qppMethods.put("wig", new WIGSpecificity(searcher));
-        qppMethods.put("clarity", new ClaritySpecificity(searcher));
-        qppMethods.put("uef_nqc", new UEFSpecificity(new NQCSpecificity(searcher)));
-        qppMethods.put("uef_wig", new UEFSpecificity(new WIGSpecificity(searcher)));
-        qppMethods.put("uef_clarity", new UEFSpecificity(new ClaritySpecificity(searcher)));
-        
-        qppTopK = Integer.parseInt(prop.getProperty("qpp.numtopdocs"));
+            corrMetrics = new HashMap<>();
+            corrMetrics.put("r", new PearsonCorrelation());
+            corrMetrics.put("rho", new SpearmanCorrelation());
+            corrMetrics.put("tau", new KendalCorrelation());
+            corrMetrics.put("qsim", new QuantizedSimCorrelation(Integer.parseInt(prop.getProperty("qsim.numintervals", "5"))));
+            corrMetrics.put("qsim_strict", new QuantizedStrictMatchCorrelation(Integer.parseInt(prop.getProperty("qsim.numintervals", "5"))));
+            corrMetrics.put("pairacc", new PairwiseAccuracyMetric());
+            corrMetrics.put("classacc", new QuantizedClassAccuracy(Integer.parseInt(prop.getProperty("qsim.numintervals", "5"))));
+            corrMetrics.put("rmse", new RmseCorrelation());
 
-        initialized = true;
+            retEvalMetrics = new HashMap<>();
+            retEvalMetrics.put("ap", Metric.AP);
+            retEvalMetrics.put("p_10", Metric.P_10);
+            retEvalMetrics.put("recall", Metric.Recall);
+            retEvalMetrics.put("ndcg", Metric.nDCG);
+
+            qppMethods = new HashMap<>();
+            qppMethods.put("avgidf", new AvgIDFSpecificity(searcher));
+            qppMethods.put("nqc", new NQCSpecificity(searcher));
+            qppMethods.put("wig", new WIGSpecificity(searcher));
+            qppMethods.put("clarity", new ClaritySpecificity(searcher));
+            qppMethods.put("uef_nqc", new UEFSpecificity(new NQCSpecificity(searcher)));
+            qppMethods.put("uef_wig", new UEFSpecificity(new WIGSpecificity(searcher)));
+            qppMethods.put("uef_clarity", new UEFSpecificity(new ClaritySpecificity(searcher)));
+
+            qppTopK = Integer.parseInt(prop.getProperty("qpp.numtopdocs"));
+
+            retModelMap.put("lmjm", new LMJelinekMercerSimilarity(0.6f));
+            retModelMap.put("lmdir", new LMDirichletSimilarity(1000));
+            retModelMap.put("bm25", new BM25Similarity(0.7f, 0.3f));
+
+            initialized = true;
+        }
+        catch (Exception ex) {
+            ex.printStackTrace();
+        }
     }
 
-    public SettingsLoader(String propFile) throws IOException {
-        prop = new Properties();
-        prop.load(new FileReader(propFile));
-
-        File indexDir = new File(prop.getProperty("index.dir"));
-        System.out.println("Running queries against index: " + indexDir.getPath());
-
-        reader = DirectoryReader.open(FSDirectory.open(indexDir.toPath()));
-        searcher = new IndexSearcher(reader);
-        numWanted = Integer.parseInt(prop.getProperty("retrieve.num_wanted", "100"));
-
-        init(prop, searcher);
+    static public Similarity getRetModel() {
+        return retModelMap.get(prop.getProperty("ret.model"));
     }
 
-    public Properties getProp() { return prop; }
+    public static Properties getProp() { return prop; }
 
-    public int getNumWanted() { return numWanted; }
-    public int getQppTopK() { return qppTopK; }
+    public static int getNumWanted() { return numWanted; }
+    public static int getQppTopK() { return qppTopK; }
 
-    public QPPCorrelationMetric getCorrelationMetric() {
+    public static QPPCorrelationMetric getCorrelationMetric() {
         String key = prop.getProperty("qpp.metric");
         return corrMetrics.get(key);
     }
 
-    public IndexSearcher getSearcher() { return searcher; }
+    public static IndexSearcher getSearcher() { return searcher; }
 
-    public QPPMethod getQPPMethod() {
+    public static QPPMethod getQPPMethod() {
         String key = prop.getProperty("qpp.method");
         return qppMethods.get(key);
     }
     
-    public int getTrainTestSplits() {
+    static public int getTrainPercentage() {
         int splits = Integer.parseInt(prop.getProperty("qpp.splits"));
         return splits;
     }

@@ -4,6 +4,7 @@ import java.io.*;
 import java.util.*;
 
 import org.apache.commons.math3.stat.StatUtils;
+import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.StopFilter;
 import org.apache.lucene.analysis.en.EnglishAnalyzer;
@@ -12,6 +13,7 @@ import org.apache.lucene.index.*;
 import org.apache.lucene.search.*;
 import org.apache.lucene.search.similarities.*;
 import org.correlation.KendalCorrelation;
+import org.correlation.MinMaxNormalizer;
 import org.correlation.PearsonCorrelation;
 import org.correlation.QPPCorrelationMetric;
 import org.evaluator.Evaluator;
@@ -36,7 +38,9 @@ public class QPPEvaluator {
     TopScoreDocCollector      collector;
     TRECQueryParser           trecQueryParser;
     RerankedDocInfo           rerankDocInfo;
+    static SettingsLoader     loader;
     
+    static final String RES_FILE = "/tmp/res";
 
     public QPPEvaluator(Properties prop, QPPCorrelationMetric correlationMetric, IndexSearcher searcher, int numWanted) {
         this.prop = prop;
@@ -98,7 +102,6 @@ public class QPPEvaluator {
             new LMJelinekMercerSimilarity(0.6f),
             new LMDirichletSimilarity(1000),
             new BM25Similarity(0.7f, 0.3f),
-            //new BM25Similarity(0.5f, 1.0f)
         };
     }
     
@@ -134,10 +137,6 @@ public class QPPEvaluator {
         return aggregated_idf/(double)qterms.size();
     }
 
-    double[] evaluate(List<TRECQuery> queries, Similarity sim, Metric m) throws Exception {
-        return evaluate(queries, sim, m, numWanted);
-    }
-
     public Evaluator executeQueries(List<TRECQuery> queries, Similarity sim,
                                     int cutoff, String qrelsFile, String resFile, 
                                     Map<String, TopDocs> topDocsMap) throws Exception {
@@ -161,16 +160,14 @@ public class QPPEvaluator {
         Evaluator evaluator = new Evaluator(qrelsFile, resFile); // load ret and rel
         return evaluator;
     }
-    
-    // Evaluate a given metric (e.g. AP/P@5) for all queries. Return an array of these computed values
+
     double[] evaluate(List<TRECQuery> queries, Similarity sim, Metric m, int cutoff) throws Exception {
         topDocsMap = new HashMap<>();
 
         int numQueries = queries.size();
         double[] evaluatedMetricValues = new double[numQueries];
 
-        final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene8.8.0/data/sample.res";
-        FileWriter fw = new FileWriter(resFile);
+        FileWriter fw = new FileWriter(RES_FILE);
         BufferedWriter bw = new BufferedWriter(fw);
 
         for (TRECQuery query : queries) {
@@ -183,7 +180,7 @@ public class QPPEvaluator {
         fw.close();
 
         String qrelsFile = prop.getProperty("qrels.file");
-        Evaluator evaluator = new Evaluator(qrelsFile, resFile); // load ret and rel
+        Evaluator evaluator = new Evaluator(qrelsFile, RES_FILE); // load ret and rel
 
         int i=0;
         for (TRECQuery query : queries) {
@@ -191,107 +188,18 @@ public class QPPEvaluator {
         }
         return evaluatedMetricValues;
     }
-    
-    double[] evaluate(List<TRECQuery> queries, Similarity sim, Metric m, int cutoff, String resFile) throws Exception {
-        topDocsMap = new HashMap<>();
 
-        int numQueries = queries.size();
-        double[] evaluatedMetricValues = new double[numQueries];
-
-        FileWriter fw = new FileWriter(resFile);
-        BufferedWriter bw = new BufferedWriter(fw);
-
-        for (TRECQuery query : queries) {
-            TopDocs topDocs = retrieve(query, sim, cutoff);
-            topDocsMap.put(query.title, topDocs);
-            saveRetrievedTuples(bw, query, topDocs, sim.toString());
-        }
-        bw.flush();
-        bw.close();
-        fw.close();
-
-        String qrelsFile = prop.getProperty("qrels.file");
-        Evaluator evaluator = new Evaluator(qrelsFile, resFile); // load ret and rel
-
-        int i=0;
-        for (TRECQuery query : queries) {
-            evaluatedMetricValues[i++] = evaluator.compute(query.id, m);
-        }
-        return evaluatedMetricValues;
-    }
-    
-    // Evaluate a given metric (e.g. AP/P@5) for all queries. Return a hashmap
-    // of these computed values <qid, metric>
-    Map<String, Double> evaluateMap(List<TRECQuery> queries, Similarity sim, 
-            Metric m, int cutoff) throws Exception {
-        
-        topDocsMap = new HashMap<>();
-
-        int numQueries = queries.size();
-        Map<String, Double> evaluatedMetricValues = new HashMap<>();
-
-        final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene8.8.0/data/sample.res";
-        FileWriter fw = new FileWriter(resFile);
-        BufferedWriter bw = new BufferedWriter(fw);
-
-        for (TRECQuery query : queries) {
-            TopDocs topDocs = retrieve(query, sim, cutoff);
-            topDocsMap.put(query.title, topDocs);
-            saveRetrievedTuples(bw, query, topDocs, sim.toString());
-        }
-        bw.flush();
-        bw.close();
-        fw.close();
-
-        String qrelsFile = prop.getProperty("qrels.file");
-        Evaluator evaluator = new Evaluator(qrelsFile, resFile); // load ret and rel
-
-        for (TRECQuery query : queries) {
-            evaluatedMetricValues.put(query.id, evaluator.compute(query.id, m));
-        }
-        return evaluatedMetricValues;
-    }
-    
-    Map<String, Double> evaluateMap(List<TRECQuery> queries, Similarity sim, 
-            Metric m, int cutoff, String resFile) throws Exception {
-        
-        topDocsMap = new HashMap<>();
-
-        int numQueries = queries.size();
-        Map<String, Double> evaluatedMetricValues = new HashMap<>();
-
-        FileWriter fw = new FileWriter(resFile);
-        BufferedWriter bw = new BufferedWriter(fw);
-
-        for (TRECQuery query : queries) {
-            TopDocs topDocs = retrieve(query, sim, cutoff);
-            topDocsMap.put(query.title, topDocs);
-            saveRetrievedTuples(bw, query, topDocs, sim.toString());
-        }
-        bw.flush();
-        bw.close();
-        fw.close();
-
-        String qrelsFile = prop.getProperty("qrels.file");
-        Evaluator evaluator = new Evaluator(qrelsFile, resFile); // load ret and rel
-
-        for (TRECQuery query : queries) {
-            evaluatedMetricValues.put(query.id, evaluator.compute(query.id, m));
-        }
-        return evaluatedMetricValues;
-    }
-
-    public double evaluateQPPOnModel(
-            QPPMethod qppMethod, List<TRECQuery> queries, 
-            double[] evaluatedMetricValues, Metric m) throws Exception {
-        
-        final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene8.8.0/data/sample.res";
+    public double[] getQPPEstimates(
+            QPPMethod qppMethod,
+            List<TRECQuery> queries,
+            double[] evaluatedMetricValues,
+            Metric m) throws Exception {
         double[] qppEstimates = new double[queries.size()];
         int i = 0;
 
         int qppTopK = Integer.parseInt(prop.getProperty("qpp.numtopdocs"));
         String qrelsFile = prop.getProperty("qrels.file");
-        Evaluator evaluator = new Evaluator(qrelsFile, resFile); // load ret and rel
+        Evaluator evaluator = new Evaluator(qrelsFile, RES_FILE); // load ret and rel
 
         for (TRECQuery query : queries) {
             RetrievedResults rr = evaluator.getRetrievedResultsForQueryId(query.id);
@@ -303,88 +211,37 @@ public class QPPEvaluator {
             qppEstimates[i] = qppMethod.computeSpecificity(query.getLuceneQueryObj(), rr, topDocs, qppTopK);
             i++;
         }
-        
-        System.out.print("Correlation Coefficient : " + correlationMetric.name() + " --- ");
-        
-        return correlationMetric.correlation(evaluatedMetricValues, qppEstimates);
-    }
-    
-    public double[] evaluateQPPOnModel(
-            QPPMethod qppMethod, List<TRECQuery> queries, 
-            double[] evaluatedMetricValues, Metric m, String resFile) throws Exception {
-        
-//        final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene5.3.1/data/sample.res";
-        double[] qppEstimates = new double[queries.size()];
-        int i = 0;
-
-        int qppTopK = Integer.parseInt(prop.getProperty("qpp.numtopdocs"));
-        String qrelsFile = prop.getProperty("qrels.file");
-        Evaluator evaluator = new Evaluator(qrelsFile, resFile); // load ret and rel
-
-        for (TRECQuery query : queries) {
-            RetrievedResults rr = evaluator.getRetrievedResultsForQueryId(query.id);
-            TopDocs topDocs = topDocsMap.get(query.title);
-            if (topDocs==null) {
-                System.err.println("No Topdocs found for query <" + query.title + ">");
-                System.exit(1);
-            }
-            qppEstimates[i] = qppMethod.computeSpecificity(query.getLuceneQueryObj(), rr, topDocs, qppTopK);
-            i++;
-        }
-        
         return qppEstimates;
     }
-    
-    public double evaluateQPPOnModel(
-            QPPMethod qppMethod, List<TRECQuery> queries, 
-            Map<String, Double> evaluatedMetricValues, Metric m) throws Exception {
-        
-        final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene8.8.0/data/sample.res";
-        Map<String, Double> qppEstimates = new HashMap<>();
-        int qppTopK = Integer.parseInt(prop.getProperty("qpp.numtopdocs"));
-        String qrelsFile = prop.getProperty("qrels.file");
-        Evaluator evaluator = new Evaluator(qrelsFile, resFile); // load ret and rel
 
-        for (TRECQuery query : queries) {
-            RetrievedResults rr = evaluator.getRetrievedResultsForQueryId(query.id);
-            TopDocs topDocs = topDocsMap.get(query.title);
-            if (topDocs==null) {
-                System.err.println("No Topdocs found for query <" + query.title + ">");
-                System.exit(1);
-            }
-            qppEstimates.put(query.id, qppMethod.computeSpecificity(query.getLuceneQueryObj(), rr, topDocs, qppTopK));
-        }
-        
-//        double corr = correlationMetric.correlation(evaluatedMetricValues, qppEstimates);
-        System.out.print("Correlation Coefficient : " + correlationMetric.name() + " --- ");
-        
-        return correlationMetric.correlation(evaluatedMetricValues, qppEstimates);
+    public double evaluateQPPOnModel(
+            QPPMethod qppMethod,
+            List<TRECQuery> queries,
+            double[] evaluatedMetricValues,
+            Metric m) throws Exception {
+        double[] estimates = getQPPEstimates(qppMethod, queries, evaluatedMetricValues, m);
+        return correlationMetric.correlation(evaluatedMetricValues, estimates);
     }
 
     /* Returns a map of qid :-> ret_eval_value (e.g. AP value) */
-    public Map<String, Double> evaluateQPPOnModel(
-            QPPMethod qppMethod, List<TRECQuery> queries, 
-            Map<String, Double> evaluatedMetricValues, Metric m, String resFile) throws Exception {
-        
-        Map<String, Double> qppEstimates = new HashMap<>();
-        int qppTopK = Integer.parseInt(prop.getProperty("qpp.numtopdocs"));
-        String qrelsFile = prop.getProperty("qrels.file");
-        Evaluator evaluator = new Evaluator(qrelsFile, resFile); // load ret and rel
+    public double evaluateQPPOnModel(
+            QPPMethod qppMethod,
+            List<TRECQuery> queries,
+            double[] evaluatedMetricValues,
+            Metric m, boolean transform) throws Exception {
 
-        for (TRECQuery query : queries) {
-            RetrievedResults rr = evaluator.getRetrievedResultsForQueryId(query.id);
-            TopDocs topDocs = topDocsMap.get(query.title);
-            if (topDocs==null) {
-                System.err.println("No Topdocs found for query <" + query.title + ">");
-                System.exit(1);
-            }
-            qppEstimates.put(query.id, qppMethod.computeSpecificity(query.getLuceneQueryObj(), rr, topDocs, qppTopK));
+        double[] estimates = getQPPEstimates(qppMethod, queries, evaluatedMetricValues, m);
+
+        SimpleRegression reg = new SimpleRegression();
+        double[] n_pred = MinMaxNormalizer.normalize(estimates); // in [0, 1]
+        for (int i=0; i<evaluatedMetricValues.length; i++) {
+            reg.addData(n_pred[i], evaluatedMetricValues[i]);
         }
-        
-        return qppEstimates;
+
+        return correlationMetric.correlation(evaluatedMetricValues, estimates);
     }
-    
-    public double measureCorrelation (Map<String, Double> evaluatedMetricValues, Map<String, Double> qppEstimates) {
+
+    public double measureCorrelation (double[] evaluatedMetricValues, double[] qppEstimates) {
         return correlationMetric.correlation(evaluatedMetricValues, qppEstimates);
     }
     
@@ -434,13 +291,6 @@ public class QPPEvaluator {
             relativeSystemRanksAcrossMetrics(sim, queries, cutoff);
         }
     }
-    
-    public void relativeSystemRanksAcrossMetrics(List<TRECQuery> queries, int[] cutoff) throws Exception {
-        Similarity[] sims = modelsToTest();
-        for (Similarity sim: sims) {
-            relativeSystemRanksAcrossMetrics(sim, queries, cutoff);
-        }
-    }
 
     /*
     Compute how much system rankings change with different settings for different IR models (BM25, LM etc.).
@@ -452,7 +302,6 @@ public class QPPEvaluator {
 
         Metric[] metricForEval = Metric.values();
         QPPMethod[] qppMethods = qppMethods();
-        System.out.println("QPP METHODS : " + qppMethods.length);
 
         // Rho and tau scores across the QPP methods.
         double[][] corr_scores = new double[metricForEval.length][qppMethods.length];
@@ -464,9 +313,7 @@ public class QPPEvaluator {
         for (i=0; i< metricForEval.length; i++) { // pre-evaluate for each metric
             Metric m = metricForEval[i];
             double[] evaluatedMetricValues = evaluate(queries, sim, m, cutoff);
-//            System.out.println("$$$$$$$$$$$ : " + evaluatedMetricValues.length);
             preEvaluated.put(i, evaluatedMetricValues);
-//            System.out.println("%%%%% : " + preEvaluated);
             System.out.println(String.format("Average %s (IR-model: %s, Metric: %s): %.4f",
                     m.toString(), sim.toString(), m.toString(),
                     StatUtils.mean(evaluatedMetricValues)));
@@ -474,7 +321,7 @@ public class QPPEvaluator {
 
         k = 0;
         for (QPPMethod qppMethod: qppMethods) {
-            System.out.println("#################### : " + qppMethod.name());
+            System.out.println(qppMethod.name());
             for (i = 0; i < metricForEval.length-1; i++) {
                 rankcorr = evaluateQPPOnModel(qppMethod, queries, preEvaluated.get(i), metricForEval[i]);
                 System.out.println(rankcorr);
@@ -500,64 +347,71 @@ public class QPPEvaluator {
             }
         }
     }
-    
-    public void relativeSystemRanksAcrossMetrics(Similarity sim, List<TRECQuery> queries, int[] cutoff) throws Exception {
-        int i, j, k, l, key = 0;
+
+    private void fit(List<TRECQuery> trainQueries) throws Exception {
+        QPPMethod qppMethod = SettingsLoader.getQPPMethod();
+        Similarity sim = SettingsLoader.getRetModel();
+        Metric m = SettingsLoader.getRetEvalMetric();
+        int nwanted = SettingsLoader.getNumWanted();
+
+        double[] retEvalMeasure = evaluate(trainQueries, sim, m, nwanted);
+        // return value isn't useful on the training set
+        double correlation = evaluateQPPOnModel(qppMethod, trainQueries, retEvalMeasure, m, true);
+    }
+
+    public void relativeSystemRanksAcrossMetrics(Similarity sim,
+             List<TRECQuery> trainQueries,
+             List<TRECQuery> testQueries, int cutoff) throws Exception {
+        int i, j, k;
 
         Metric[] metricForEval = Metric.values();
-        System.out.println("Metric for eval : " + metricForEval.length);
         QPPMethod[] qppMethods = qppMethods();
-        System.out.println("QPP METHODS : " + qppMethods.length);
+
+        System.out.println(String.format("Fitting linear regression on %s scores", SettingsLoader.getRetEvalMetric()));
+        fit(trainQueries);
+
         // Rho and tau scores across the QPP methods.
-        double[][] corr_scores = new double[metricForEval.length * cutoff.length][qppMethods.length];
+        double[][] corr_scores = new double[metricForEval.length][qppMethods.length];
         double rankcorr;
 
-        int numQueries = queries.size();
-        Map<Integer, double[]> preEvaluated = new HashMap<>();
+        int numQueries = testQueries.size();
+        Map<String, double[]> preEvaluated = new HashMap<>();
 
-        for (i = 0; i < metricForEval.length; i++) { // pre-evaluate for each metric
+        for (i=0; i< metricForEval.length; i++) { // pre-evaluate for each metric
             Metric m = metricForEval[i];
-            System.out.println("metric name : " + m.name());
-            for (l = 0; l< cutoff.length; l++) {
-                double[] evaluatedMetricValues = evaluate(queries, sim, m, cutoff[l]);
-//                System.out.println("$$$$$$$$$$$ : " + evaluatedMetricValues.length);
-                preEvaluated.put(key, evaluatedMetricValues);
-//                System.out.println("%%%%% : " + preEvaluated);
-                System.out.println(String.format("Average %s (IR-model: %s, Metric: %s): %.4f",
-                        m.toString(), sim.toString(), m.toString(),
-                        StatUtils.mean(evaluatedMetricValues)));
-                key++;
-            }
+            double[] evaluatedMetricValues = evaluate(testQueries, sim, m, cutoff);
+            preEvaluated.put(metricForEval[i].name(), evaluatedMetricValues);
+            System.out.println(String.format("Average %s (IR-model: %s, Metric: %s): %.4f",
+                    m.toString(), sim.toString(), m.toString(),
+                    StatUtils.mean(evaluatedMetricValues)));
         }
 
         k = 0;
-        int metric = 0;
         for (QPPMethod qppMethod: qppMethods) {
-            System.out.println("#################### : " + qppMethod.name());
-            for (i = 0; i < preEvaluated.size(); i++) {
-                if (i > 0 && i % 3 == 0)
-                    metric++;
-                System.out.println("Metric name : " + metricForEval[metric]);
-                rankcorr = evaluateQPPOnModel(qppMethod, queries, preEvaluated.get(i), metricForEval[metric]);
-                System.out.println(rankcorr);
+            System.out.println(qppMethod.name());
+
+            for (i = 0; i < metricForEval.length-1; i++) {
+                double[] evaluatedMetricValues = preEvaluated.get(metricForEval[i].name());
+                rankcorr = evaluateQPPOnModel(qppMethod, testQueries, preEvaluated.get(i), metricForEval[i]);
                 corr_scores[i][k] = rankcorr;
-//                System.out.println("i = " + i + "\t" + "k = " + k);
+
+                for (j = i+1; j < metricForEval.length; j++) {
+                    rankcorr = evaluateQPPOnModel(qppMethod, testQueries, preEvaluated.get(j), metricForEval[j]);
+                    System.out.println(rankcorr);
+                    corr_scores[j][k] = rankcorr;
+                }
             }
-            metric = 0;
             k++;
         }
-        
-        MetricCutOff[] metricContingency = MetricCutOff.values();
+
         System.out.println("Contingency for IR model: " + sim.toString());
-        for (i = 0; i < preEvaluated.size()-1; i++) {
-            if (i > 0 && i % 3 == 0)
-                metric++;
-//            System.out.println("Rho values using " + sim.toString() + ", " + metricForEval[i].name() + " as GT");
-            for (j = i + 1; j < preEvaluated.size(); j++) {
-                double inter_corr = rankCorrAcrossCutOffs(corr_scores, i, j, new KendalCorrelation());
-//                System.out.println("Rho values using " + sim.toString() + ", " + metricForEval[j].name() + " as GT");
-                System.out.printf("%s %s/%s: %s = %.4f \n", sim.toString(), metricContingency[i].name(), 
-                        metricContingency[j].name(), correlationMetric.name(), inter_corr);
+        for (i = 0; i < metricForEval.length-1; i++) {
+            System.out.println("Rho values using " + sim.toString() + ", " + metricForEval[i].name() + " as GT");
+            for (j = i + 1; j < metricForEval.length; j++) {
+                double inter_corr = rankCorrAcrossCutOffs(corr_scores, i, j, new PearsonCorrelation());
+                System.out.println("Rho values using " + sim.toString() + ", " + metricForEval[j].name() + " as GT");
+                System.out.printf("%s %s/%s: %s = %.4f \n",
+                        sim.toString(), metricForEval[i].name(), metricForEval[j].name(), correlationMetric.name(), inter_corr);
             }
         }
     }
@@ -715,7 +569,7 @@ public class QPPEvaluator {
         }
 
         try {
-            SettingsLoader loader = new SettingsLoader(args[0]);
+            loader.init(args[0]);
 
             QPPEvaluator qppEvaluator = new QPPEvaluator(
                     loader.getProp(), loader.getCorrelationMetric(), 

@@ -6,18 +6,11 @@
 
 package org.experiments;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Random;
+import java.util.*;
 
 import org.apache.lucene.search.similarities.LMDirichletSimilarity;
 import org.apache.lucene.search.similarities.Similarity;
 import org.correlation.MinMaxNormalizer;
-import org.correlation.QPPCorrelationMetric;
 import org.evaluator.Metric;
 import org.qpp.QPPMethod;
 import org.regressor.FitLinearRegressor;
@@ -81,11 +74,12 @@ public class QPPLinearRegressor {
               QPPMethod qppMethod, Metric m,
               Similarity sim, int nwanted) throws Exception {
 
-        double [] corrMeasure = qppEvaluator.evaluate(trainQueries, sim, m, nwanted, resFileTrain);
-        double [] qppEstimates = qppEvaluator.evaluateQPPOnModel(qppMethod, trainQueries, corrMeasure, m, resFileTrain);
+        double[] retEvalMeasure = qppEvaluator.evaluate(trainQueries, sim, m, nwanted);
+        double[] qppEstimates = qppEvaluator.getQPPEstimates(qppMethod, trainQueries, retEvalMeasure, m);
 
         FitLinearRegressor fr = new FitLinearRegressor();
-        fr.fitLine(corrMeasure, qppEstimates);
+        fr.fit(retEvalMeasure, qppEstimates);
+
         lr.setSlope(fr.getSlope());
         lr.setyIntercept(fr.getIntercept());
     }
@@ -93,20 +87,21 @@ public class QPPLinearRegressor {
     public CorrelationPair predict(QPPEvaluator qppEvaluator, QPPMethod qppMethod, Metric m,
                         Similarity sim, int nwanted) throws Exception {
 
-        Map<String, Double> corrMeasure = qppEvaluator.evaluateMap(testQueries, sim, m, nwanted, resFileTest);
-        Map<String, Double> corrMeasureNormalized = MinMaxNormalizer.normalize(corrMeasure);
+        double[] perQueryRetEvalMeasure = qppEvaluator.evaluate(testQueries, sim, m, nwanted);
+        double[] qppEstimates = qppEvaluator.getQPPEstimates(qppMethod, testQueries, perQueryRetEvalMeasure, m);
+        qppEstimates = MinMaxNormalizer.normalize(qppEstimates);
 
-        Map<String, Double> qppEstimates = qppEvaluator.evaluateQPPOnModel(qppMethod, testQueries, corrMeasure, m, resFileTest);
-        float x = (float)qppEvaluator.measureCorrelation(corrMeasure, qppEstimates);
+        float x = (float)qppEvaluator.measureCorrelation(perQueryRetEvalMeasure, qppEstimates);
 
-        Map<String, Double> qppEstimateWithRegressor = new HashMap<>();
-        for (Map.Entry<String, Double> spec : qppEstimates.entrySet()) {
-            qppEstimateWithRegressor.put(spec.getKey(), lr.getSlope() * spec.getValue() + lr.getyIntercept());
+        // Transform with LR
+        double[] qppEstimatesTransformed = new double[qppEstimates.length];
+        for (int i=0; i < qppEstimates.length; i++) {
+            double transformed = lr.getSlope() * qppEstimates[i] + lr.getyIntercept();
+            System.out.println(String.format("%.4f --> %.4f", qppEstimates[i], transformed));
+            qppEstimatesTransformed[i] = transformed;
         }
 
-        qppEstimateWithRegressor = MinMaxNormalizer.normalize(qppEstimateWithRegressor);
-        float y = (float)qppEvaluator.measureCorrelation(corrMeasureNormalized, qppEstimateWithRegressor);
-
+        float y = (float)qppEvaluator.measureCorrelation(perQueryRetEvalMeasure, qppEstimatesTransformed);
         return new CorrelationPair(x, y);
     }
     
@@ -116,11 +111,11 @@ public class QPPLinearRegressor {
             args[0] = "qpp.properties";
         }
 
-        loader = new SettingsLoader(args[0]);
+        loader.init(args[0]);
         QPPEvaluator qppEvaluator = new QPPEvaluator(loader.getProp(),
                 loader.getCorrelationMetric(), loader.getSearcher(),
                 loader.getNumWanted());
-        QPPLinearRegressor qppreg = new QPPLinearRegressor(loader.getProp(), loader.getTrainTestSplits());
+        QPPLinearRegressor qppreg = new QPPLinearRegressor(loader.getProp(), loader.getTrainPercentage());
 
         List<TRECQuery> queries = qppEvaluator.constructQueries();
         // create train:test splits

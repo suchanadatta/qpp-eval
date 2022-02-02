@@ -99,29 +99,32 @@ public class QPPPolynomialRegressor {
     
     public void predictCorrelationTestSetIndividual(QPPMethod [] qppMethods, QPPEvaluator qppEvaluator,
             Similarity sim, int nwanted) throws Exception {
+
         for (QPPMethod qppMethod: qppMethods) { 
             System.out.println("QPP method : " + qppMethod.name());
             for (Metric m : Metric.values()){
                 System.out.println("METRIC : " + m.name());
                 
-                Map<String, Double> corrMeasure = qppEvaluator.evaluateMap(testQueries, sim, m, nwanted, resFileTest);
-                System.out.println("CORR : " + corrMeasure.size());
+                double[] corrMeasure = qppEvaluator.evaluate(testQueries, sim, m, nwanted, resFileTest);
+                System.out.println("CORR : " + corrMeasure.length);
                 corrMeasure = MinMaxNormalizer.normalize(corrMeasure);
                 
-                Map<String, Double> qppEstimates = qppEvaluator.evaluateQPPOnModel(qppMethod, testQueries, corrMeasure, m, resFileTest);
-                System.out.println("ESTIMATE : " + qppEstimates.size());
+                double[] qppEstimates = qppEvaluator.evaluateQPPOnModel(qppMethod, testQueries, corrMeasure, m, resFileTest);
+                System.out.println("ESTIMATE : " + qppEstimates.length);
 //                qppEstimates = MinMaxNormalizer.normalize(qppEstimates);
-                Map<String, Double> qppEstimateWithRegressor = new HashMap<>();
+                double[] qppEstimateWithRegressor = new double[qppEstimates.length];
                 
                 for (RegressionLearner lr : regressionLearner) {
                     if (lr.getQppMethod().equalsIgnoreCase(qppMethod.name()) && 
                             lr.getMetric().equalsIgnoreCase(m.name())) {
-                        System.out.println("======= " + lr.getMetric() + "\t" + lr.qppMethod + "=======");
-                        for (Map.Entry<String, Double> spec : qppEstimates.entrySet()) {
-                            qppEstimateWithRegressor.put(spec.getKey(), lr.getSlope() * spec.getValue() + lr.getyIntercept());
-                            qppEstimateWithRegressor.put(spec.getKey(), lr.getCoeff()[degree] + 
-                                    lr.getCoeff()[degree-1] * Math.pow(spec.getValue(), degree-1) +
-                                    lr.getCoeff()[degree-2] * Math.pow(spec.getValue(), degree-2));
+
+                        int i = 0;
+                        for (double x : qppEstimates) {
+                            qppEstimateWithRegressor[i] = lr.getSlope() * x + lr.getyIntercept();
+                            qppEstimateWithRegressor[i] = lr.getCoeff()[degree] +
+                                    lr.getCoeff()[degree-1] * Math.pow(x, degree-1) +
+                                    lr.getCoeff()[degree-2] * Math.pow(x, degree-2);
+                            i++;
                         } 
                     }
                 }
@@ -144,7 +147,7 @@ public class QPPPolynomialRegressor {
             QPPEvaluator qppEvaluator = new QPPEvaluator(loader.getProp(), 
                     loader.getCorrelationMetric(), loader.getSearcher(), 
                     loader.getNumWanted());
-            QPPPolynomialRegressor polreg = new QPPPolynomialRegressor(loader.getProp(), loader.getTrainTestSplits());
+            QPPPolynomialRegressor polreg = new QPPPolynomialRegressor(loader.getProp(), loader.getTrainPercentage());
 
             List<TRECQuery> queries = qppEvaluator.constructQueries();
             System.out.println("QUERIES : " + queries.size() + "\t" + queries.get(0).id);

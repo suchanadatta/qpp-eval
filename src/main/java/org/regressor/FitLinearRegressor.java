@@ -21,18 +21,16 @@ public class FitLinearRegressor {
         re = new SimpleRegression();
     }   
     
-    public void fitLine (double [] gt, double [] pred) {
-        double[] n_gt = MinMaxNormalizer.normalize(gt); // in [0, 1]
+    public void fit(double[] gt, double[] pred) {
         double[] n_pred = MinMaxNormalizer.normalize(pred); // in [0, 1]
         for (int i=0; i<gt.length; i++) {
-            re.addData(n_pred[i], n_gt[i]);
+            re.addData(n_pred[i], gt[i]);
         }
     }
     
     public double getSlope() {
         return re.getSlope();
     }
-    
     public double getIntercept() {
         return re.getIntercept();
     }
