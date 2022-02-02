@@ -31,8 +31,8 @@ public class CorrelationAcrossMetrics {
 
             List<TRECQuery> queries = qppEvaluator.constructQueries();
 
-            boolean toTransform = loader.getCorrelationMetric().equals("rmse") &&
-                    Boolean.parseBoolean(loader.getProp().getProperty("regression", "false"));
+            boolean toTransform = loader.getCorrelationMetric().name().equals("rmse") &&
+                    Boolean.parseBoolean(loader.getProp().getProperty("transform_scores", "false"));
 
             if (toTransform) {
                 Collections.shuffle(queries, new Random(SEED));
