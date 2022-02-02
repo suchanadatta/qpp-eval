@@ -46,11 +46,6 @@ public class QuantizedSimCorrelation implements QPPCorrelationMetric {
     }
     
     @Override
-    public double correlation(Map<String, Double> a, Map<String, Double> b) {
-        return 0;
-    }
-
-    @Override
     public String name() {
         return "qsim";
     }

@@ -83,18 +83,15 @@ public class QPPPolynomialRegressor {
                 lr.setQppMethod(qppMethod.name());
                 lr.setMetric(m.name());
 
-                double [] corrMeasure = qppEvaluator.evaluate(trainQueries, sim, m, nwanted, resFileTrain);
-//                System.out.println("CORR : " + corrMeasure.length);
-                double [] qppEstimates = qppEvaluator.evaluateQPPOnModel(qppMethod, trainQueries, corrMeasure, m, resFileTrain);
-//                System.out.println("ESTIMATE : " + qppEstimates.length);
+                double [] corrMeasure = qppEvaluator.evaluate(trainQueries, sim, m, nwanted);
+                double [] qppEstimates = qppEvaluator.getQPPEstimates(qppMethod, trainQueries, corrMeasure, m);
 
                 FitPolyRegressor fpr = new FitPolyRegressor(degree);
                 double[] coeff = fpr.fitCurve(corrMeasure, qppEstimates);
                 lr.setCoeff(coeff);
                 regressionLearner.add(lr);
             }
-//            System.out.println("LEARN REGRESSOR : " + learnRegressor.size());
-        }  
+        }
     }
     
     public void predictCorrelationTestSetIndividual(QPPMethod [] qppMethods, QPPEvaluator qppEvaluator,
@@ -105,11 +102,11 @@ public class QPPPolynomialRegressor {
             for (Metric m : Metric.values()){
                 System.out.println("METRIC : " + m.name());
                 
-                double[] corrMeasure = qppEvaluator.evaluate(testQueries, sim, m, nwanted, resFileTest);
+                double[] corrMeasure = qppEvaluator.evaluate(testQueries, sim, m, nwanted);
                 System.out.println("CORR : " + corrMeasure.length);
                 corrMeasure = MinMaxNormalizer.normalize(corrMeasure);
                 
-                double[] qppEstimates = qppEvaluator.evaluateQPPOnModel(qppMethod, testQueries, corrMeasure, m, resFileTest);
+                double[] qppEstimates = qppEvaluator.getQPPEstimates(qppMethod, testQueries, corrMeasure, m);
                 System.out.println("ESTIMATE : " + qppEstimates.length);
 //                qppEstimates = MinMaxNormalizer.normalize(qppEstimates);
                 double[] qppEstimateWithRegressor = new double[qppEstimates.length];
@@ -143,7 +140,7 @@ public class QPPPolynomialRegressor {
         }
 
         try {
-            loader = new SettingsLoader(args[0]);
+            loader.init(args[0]);
             QPPEvaluator qppEvaluator = new QPPEvaluator(loader.getProp(), 
                     loader.getCorrelationMetric(), loader.getSearcher(), 
                     loader.getNumWanted());
@@ -161,10 +158,7 @@ public class QPPPolynomialRegressor {
             System.out.println("QPPMETHODS : " + qppMethods.length);
             
             Similarity sim = new LMDirichletSimilarity(1000);
-//            Similarity sim = new LMJelinekMercerSimilarity(0.6f);
-//            Similarity sim = new BM25Similarity(1.5f, 0.75f);
-//            Similarity sim = new BM25Similarity(0.7f, 0.3f);
-            
+
             final int nwanted = loader.getNumWanted();
             final int qppTopK = loader.getQppTopK();
             
@@ -175,8 +169,8 @@ public class QPPPolynomialRegressor {
             polreg.predictCorrelationTestSetIndividual(qppMethods, qppEvaluator, sim, nwanted);
                         
             for (RegressionLearner foo : regressionLearner) {
-                System.out.println("$$$$$$$$$$$$$$$$$$ : " 
-                + foo.getQppMethod() +"\t" + foo.getMetric() + "\t" 
+                System.out.println("$$$$$$$$$$$$$$$$$$ : "
+                + foo.getQppMethod() +"\t" + foo.getMetric() + "\t"
                         + foo.getSlope() + "\t" + foo.getyIntercept());
             }            
         }

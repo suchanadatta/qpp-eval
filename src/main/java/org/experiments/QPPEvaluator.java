@@ -40,8 +40,6 @@ public class QPPEvaluator {
     RerankedDocInfo           rerankDocInfo;
     static SettingsLoader     loader;
     
-    static final String RES_FILE = "/tmp/res";
-
     public QPPEvaluator(Properties prop, QPPCorrelationMetric correlationMetric, IndexSearcher searcher, int numWanted) {
         this.prop = prop;
         this.searcher = searcher;
@@ -167,7 +165,7 @@ public class QPPEvaluator {
         int numQueries = queries.size();
         double[] evaluatedMetricValues = new double[numQueries];
 
-        FileWriter fw = new FileWriter(RES_FILE);
+        FileWriter fw = new FileWriter(SettingsLoader.RES_FILE);
         BufferedWriter bw = new BufferedWriter(fw);
 
         for (TRECQuery query : queries) {
@@ -180,7 +178,7 @@ public class QPPEvaluator {
         fw.close();
 
         String qrelsFile = prop.getProperty("qrels.file");
-        Evaluator evaluator = new Evaluator(qrelsFile, RES_FILE); // load ret and rel
+        Evaluator evaluator = new Evaluator(qrelsFile, SettingsLoader.RES_FILE); // load ret and rel
 
         int i=0;
         for (TRECQuery query : queries) {
@@ -199,7 +197,7 @@ public class QPPEvaluator {
 
         int qppTopK = Integer.parseInt(prop.getProperty("qpp.numtopdocs"));
         String qrelsFile = prop.getProperty("qrels.file");
-        Evaluator evaluator = new Evaluator(qrelsFile, RES_FILE); // load ret and rel
+        Evaluator evaluator = new Evaluator(qrelsFile, SettingsLoader.RES_FILE); // load ret and rel
 
         for (TRECQuery query : queries) {
             RetrievedResults rr = evaluator.getRetrievedResultsForQueryId(query.id);

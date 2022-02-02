@@ -26,17 +26,22 @@ public class SettingsLoader {
     static Map<String, Metric>               retEvalMetrics;
 
     static int                               qppTopK;
-    static boolean                           boolIndexExists;
     static Properties                        prop;
     static IndexReader                       reader;
     static IndexSearcher                     searcher;
     static int                               numWanted;
-    static String                            queryFile;
-    static int                               trainPercent;
-    static String                            qrelsFile;
     static boolean initialized = false;
     static Map<String, Similarity> retModelMap = new HashMap<>(3);
-    
+    public static String RES_FILE = "/tmp/res";
+
+    static public String getQueryFile() {
+        return prop.getProperty("query.file");
+    }
+
+    static public String getQrelsFile() {
+        return prop.getProperty("qrels.file");
+    }
+
     static void init(String propFile) {
         if (initialized)
             return;

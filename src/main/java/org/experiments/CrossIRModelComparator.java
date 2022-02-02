@@ -13,18 +13,21 @@ import java.util.List;
 import java.util.Map;
 
 public class CrossIRModelComparator {
+    static SettingsLoader loader;
+
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
             args = new String[1];
-            args[0] = "init.properties";
+            args[0] = "qpp.properties";
         }
 
         Similarity[] sims = QPPEvaluator.modelsToTest();
 
-        final String queryFile = "/store/query/query";
-        final String qrelsFile = "/store/qrels/qrel";
+        final String queryFile = loader.getQueryFile();
+        final String qrelsFile = loader.getQrelsFile();
 
-        SettingsLoader loader = new SettingsLoader(args[0]);
+        loader.init(args[0]);
+
         QPPEvaluator qppEvaluator = new QPPEvaluator(
                 loader.getProp(),
                 loader.getCorrelationMetric(), loader.getSearcher(), loader.getNumWanted());

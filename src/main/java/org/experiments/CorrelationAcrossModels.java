@@ -4,7 +4,7 @@ import org.trec.TRECQuery;
 import java.util.List;
 
 public class CorrelationAcrossModels {
-
+    static SettingsLoader loader;
     public static void main(String[] args) {
         if (args.length < 1) {
             args = new String[1];
@@ -12,7 +12,7 @@ public class CorrelationAcrossModels {
         }
 
         try {
-            SettingsLoader loader = new SettingsLoader(args[0]);
+            loader.init(args[0]);
 
             QPPEvaluator qppEvaluator = new QPPEvaluator(loader.getProp(),
                     loader.getCorrelationMetric(), loader.getSearcher(), loader.getNumWanted());

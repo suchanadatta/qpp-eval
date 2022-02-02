@@ -18,7 +18,8 @@ import org.apache.lucene.search.similarities.LMJelinekMercerSimilarity;
 import org.evaluator.Metric;
 
 public class QPPScoresFileWriter {
-    
+    static SettingsLoader loader;
+
     static public QPPMethod[] qppMethods(IndexSearcher searcher) {
         QPPMethod[] qppMethods = {
                 new WIGSpecificity(searcher),
@@ -28,17 +29,18 @@ public class QPPScoresFileWriter {
     }
     
     public static void main(String[] args) {
+
         if (args.length < 1) {
             args = new String[1];
             args[0] = "qpp.properties";
         }
 
-        final String queryFile = "/store/query/trec-robust.xml";
-        final String resFile = "/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene5.3.1/outputs/lm-dir.res";
-        final String qrelsFile = "/store/qrels/trec-robust.qrel";
+        final String queryFile = loader.getQueryFile();
+        final String resFile = SettingsLoader.RES_FILE;
+        final String qrelsFile = loader.getQrelsFile();
 
         try {
-            SettingsLoader loader = new SettingsLoader(args[0]);
+            loader.init(args[0]);
 
             QPPEvaluator qppEvaluator = new QPPEvaluator(loader.getProp(),
                     loader.getCorrelationMetric(), loader.getSearcher(), loader.getNumWanted());
@@ -46,12 +48,7 @@ public class QPPScoresFileWriter {
 
             QPPMethod[] qppMethods = qppEvaluator.qppMethods();
             
-//            QPPMethod[] qppMethods = qppMethods(loader.getSearcher());
-            
             Similarity sim = new LMDirichletSimilarity(1000);
-//            Similarity sim = new LMJelinekMercerSimilarity(0.6f);
-//            Similarity sim = new BM25Similarity(1.5f, 0.75f);
-//            Similarity sim = new BM25Similarity(0.7f, 0.3f);
 
             final int nwanted = loader.getNumWanted();
             final int qppTopK = loader.getQppTopK();
@@ -60,7 +57,7 @@ public class QPPScoresFileWriter {
            
             Evaluator evaluator = qppEvaluator.executeQueries(queries, sim, nwanted, qrelsFile, resFile, topDocsMap);
 
-            FileWriter fw = new FileWriter("/home/suchana/NetBeansProjects/qpp-eval/qpp-eval-lucene5.3.1/outputs/lm-dir.qpp");
+            FileWriter fw = new FileWriter(SettingsLoader.RES_FILE);
             BufferedWriter bw = new BufferedWriter(fw);
             StringBuilder buff = new StringBuilder();
             buff.append("QID\t");
