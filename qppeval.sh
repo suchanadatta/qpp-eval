@@ -1,11 +1,12 @@
 #!/bin/bash
 
-if [ $# -lt 3 ]
+if [ $# -lt 4 ]
 then
     echo "Usage: " $0 " <following arguments in sequence>";
-    echo "1. Method (avgidf/nqc/wig/clarity/uef_nqc,/uef_wig/uef_clarity)";
-    echo "2. Retrieval Eval Metric (ap, p_10, recall, ndcg)";
-    echo "3. QPP eval Metric (r/rho/tau/qsim/qsim_strict/pairacc/class_acc/rmse)";
+    echo "1. Model (bm25/lmdir/lmjm)";
+    echo "2. Method (avgidf/nqc/wig/clarity/uef_nqc,/uef_wig/uef_clarity)";
+    echo "3. Retrieval Eval Metric (ap, p_10, recall, ndcg)";
+    echo "4. QPP eval Metric (r/rho/tau/qsim/qsim_strict/pairacc/class_acc/rmse)";
     exit 1;
 fi
 
@@ -14,15 +15,17 @@ NUMWANTED=100
 NUMTOP=50
 SPLITS=80
 
-METHOD=$1
-RETEVAL_METRIC=$2
-METRIC=$3
+MODEL=$1
+METHOD=$2
+RETEVAL_METRIC=$3
+METRIC=$4
 INDEXDIR=/Users/debasis/research/common/trecd45/index/
 QRELS=data/qrels.robust.all
 QUERYFILE=data/topics.robust.all
 
 cat > qpp.properties << EOF1
 
+ret.model=$MODEL
 index.dir=$INDEXDIR
 query.file=$QUERYFILE
 qrels.file=$QRELS
@@ -35,6 +38,7 @@ qpp.numtopdocs=$NUMTOP
 qpp.method=$METHOD
 qpp.metric=$METRIC
 qpp.splits=$SPLITS
+transform_scores=true
 
 EOF1
 
@@ -42,6 +46,6 @@ EOF1
 #mvn exec:java@compute_all -Dexec.args="qpp.properties"
 #mvn exec:java@across_metrics -Dexec.args="qpp.properties"
 #mvn exec:java@across_models -Dexec.args="qpp.properties"
-#mvn exec:java@linear_regressor -Dexec.args="qpp.properties"
+mvn exec:java@linear_regressor -Dexec.args="qpp.properties"
 #mvn exec:java@poly_regressor -Dexec.args="qpp.properties"
 

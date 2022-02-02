@@ -19,7 +19,7 @@ import org.evaluator.Metric;
 import org.qpp.*;
 
 
-public class SettingsLoader {
+public class Settings {
 
     static Map<String, QPPCorrelationMetric> corrMetrics;
     static Map<String, QPPMethod>            qppMethods;

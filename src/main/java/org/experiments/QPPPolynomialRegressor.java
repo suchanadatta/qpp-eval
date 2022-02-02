@@ -8,9 +8,7 @@ package org.experiments;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 
@@ -30,7 +28,6 @@ import org.trec.TRECQuery;
  */
 
 public class QPPPolynomialRegressor {
-    static SettingsLoader       loader;
     Properties                  prop;
     int                         partition;
     int                         degree;
@@ -140,11 +137,11 @@ public class QPPPolynomialRegressor {
         }
 
         try {
-            loader.init(args[0]);
-            QPPEvaluator qppEvaluator = new QPPEvaluator(loader.getProp(), 
-                    loader.getCorrelationMetric(), loader.getSearcher(), 
-                    loader.getNumWanted());
-            QPPPolynomialRegressor polreg = new QPPPolynomialRegressor(loader.getProp(), loader.getTrainPercentage());
+            Settings.init(args[0]);
+            QPPEvaluator qppEvaluator = new QPPEvaluator(Settings.getProp(),
+                    Settings.getCorrelationMetric(), Settings.getSearcher(),
+                    Settings.getNumWanted());
+            QPPPolynomialRegressor polreg = new QPPPolynomialRegressor(Settings.getProp(), Settings.getTrainPercentage());
 
             List<TRECQuery> queries = qppEvaluator.constructQueries();
             System.out.println("QUERIES : " + queries.size() + "\t" + queries.get(0).id);
@@ -159,8 +156,8 @@ public class QPPPolynomialRegressor {
             
             Similarity sim = new LMDirichletSimilarity(1000);
 
-            final int nwanted = loader.getNumWanted();
-            final int qppTopK = loader.getQppTopK();
+            final int nwanted = Settings.getNumWanted();
+            final int qppTopK = Settings.getQppTopK();
             
             // learn individual regressor learning parameters for individual qpp estimators
             polreg.fitRegressorTrainSetIndividualSetting(qppMethods, qppEvaluator, sim, nwanted);
@@ -169,8 +166,7 @@ public class QPPPolynomialRegressor {
             polreg.predictCorrelationTestSetIndividual(qppMethods, qppEvaluator, sim, nwanted);
                         
             for (RegressionLearner foo : regressionLearner) {
-                System.out.println("$$$$$$$$$$$$$$$$$$ : "
-                + foo.getQppMethod() +"\t" + foo.getMetric() + "\t"
+                System.out.println(foo.getQppMethod() +"\t" + foo.getMetric() + "\t"
                         + foo.getSlope() + "\t" + foo.getyIntercept());
             }            
         }

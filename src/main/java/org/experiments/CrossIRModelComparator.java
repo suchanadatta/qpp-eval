@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 
 public class CrossIRModelComparator {
-    static SettingsLoader loader;
 
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
@@ -21,18 +20,17 @@ public class CrossIRModelComparator {
             args[0] = "qpp.properties";
         }
 
+        Settings.init(args[0]);
         Similarity[] sims = QPPEvaluator.modelsToTest();
 
-        final String queryFile = loader.getQueryFile();
-        final String qrelsFile = loader.getQrelsFile();
-
-        loader.init(args[0]);
+        final String queryFile = Settings.getQueryFile();
+        final String qrelsFile = Settings.getQrelsFile();
+        final int nwanted = Settings.getNumWanted();
 
         QPPEvaluator qppEvaluator = new QPPEvaluator(
-                loader.getProp(),
-                loader.getCorrelationMetric(), loader.getSearcher(), loader.getNumWanted());
+                Settings.getProp(),
+                Settings.getCorrelationMetric(), Settings.getSearcher(), nwanted);
         List<TRECQuery> queries = qppEvaluator.constructQueries(queryFile);
-        final int nwanted = loader.getNumWanted();
 
         Map<String, TopDocs> topDocsMap = new HashMap<>();
         Map<String, Evaluator> evaluatorMap = new HashMap<>();

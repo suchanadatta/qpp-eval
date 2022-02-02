@@ -18,7 +18,6 @@ import org.correlation.PearsonCorrelation;
 import org.correlation.QPPCorrelationMetric;
 import org.evaluator.Evaluator;
 import org.evaluator.Metric;
-import org.evaluator.MetricCutOff;
 import org.evaluator.RetrievedResults;
 import org.qpp.*;
 import org.trec.TRECQuery;
@@ -33,13 +32,9 @@ public class QPPEvaluator {
     int                       numWanted;
     Properties                prop;
     Map<String, TopDocs>      topDocsMap;
-    Map<String, List<String>> rerankDocsMap;
     QPPCorrelationMetric      correlationMetric;
-    TopScoreDocCollector      collector;
     TRECQueryParser           trecQueryParser;
-    RerankedDocInfo           rerankDocInfo;
-    static SettingsLoader     loader;
-    
+
     public QPPEvaluator(Properties prop, QPPCorrelationMetric correlationMetric, IndexSearcher searcher, int numWanted) {
         this.prop = prop;
         this.searcher = searcher;
@@ -165,7 +160,7 @@ public class QPPEvaluator {
         int numQueries = queries.size();
         double[] evaluatedMetricValues = new double[numQueries];
 
-        FileWriter fw = new FileWriter(SettingsLoader.RES_FILE);
+        FileWriter fw = new FileWriter(Settings.RES_FILE);
         BufferedWriter bw = new BufferedWriter(fw);
 
         for (TRECQuery query : queries) {
@@ -178,7 +173,7 @@ public class QPPEvaluator {
         fw.close();
 
         String qrelsFile = prop.getProperty("qrels.file");
-        Evaluator evaluator = new Evaluator(qrelsFile, SettingsLoader.RES_FILE); // load ret and rel
+        Evaluator evaluator = new Evaluator(qrelsFile, Settings.RES_FILE); // load ret and rel
 
         int i=0;
         for (TRECQuery query : queries) {
@@ -203,9 +198,9 @@ public class QPPEvaluator {
         double estimatedScore;
         double[] qppEstimates = new double[queries.size()];
 
-        int qppTopK = SettingsLoader.getQppTopK();
-        String qrelsFile = SettingsLoader.getQrelsFile();
-        Evaluator evaluator = new Evaluator(qrelsFile, SettingsLoader.RES_FILE); // load ret and rel
+        int qppTopK = Settings.getQppTopK();
+        String qrelsFile = Settings.getQrelsFile();
+        Evaluator evaluator = new Evaluator(qrelsFile, Settings.RES_FILE); // load ret and rel
 
         int i = 0;
         for (TRECQuery query : queries) {
@@ -213,9 +208,10 @@ public class QPPEvaluator {
             TopDocs topDocs = topDocsMap.get(query.title);
             if (topDocs==null) {
                 System.err.println("No Topdocs found for query <" + query.title + ">");
-                System.exit(1);
+                estimatedScore = 0;
             }
-            estimatedScore = qppMethod.computeSpecificity(query.getLuceneQueryObj(), rr, topDocs, qppTopK);
+            else
+                estimatedScore = qppMethod.computeSpecificity(query.getLuceneQueryObj(), rr, topDocs, qppTopK);
 
             if (reg != null) {
                 estimatedScore = reg.predict(evaluatedMetricValues[i]);
@@ -352,7 +348,7 @@ public class QPPEvaluator {
     private SimpleRegression fit(List<TRECQuery> trainQueries,
              QPPMethod qppMethod, Similarity sim, Metric m) throws Exception {
 
-        double[] retEvalMeasure = evaluate(trainQueries, sim, m, SettingsLoader.getNumWanted());
+        double[] retEvalMeasure = evaluate(trainQueries, sim, m, Settings.getNumWanted());
         return evaluateQPPOnModel(qppMethod, trainQueries, retEvalMeasure, m, true);
     }
 
@@ -596,16 +592,16 @@ public class QPPEvaluator {
         }
 
         try {
-            loader.init(args[0]);
+            Settings.init(args[0]);
 
             QPPEvaluator qppEvaluator = new QPPEvaluator(
-                    loader.getProp(), loader.getCorrelationMetric(), 
-                    loader.getSearcher(), loader.getNumWanted());
+                    Settings.getProp(), Settings.getCorrelationMetric(),
+                    Settings.getSearcher(), Settings.getNumWanted());
             List<TRECQuery> queries = qppEvaluator.constructQueries();
             System.out.println("Queries : " + queries.size());
-            System.out.println("QPP method loaded : " + loader.getQPPMethod().name() +
-                    "\tMeasure specificity on docs :" + loader.getNumWanted());
-            qppEvaluator.evaluateQPPAtCutoff(loader.getQPPMethod(), queries, loader.getNumWanted());
+            System.out.println("QPP method loaded : " + Settings.getQPPMethod().name() +
+                    "\tMeasure specificity on docs :" + Settings.getNumWanted());
+            qppEvaluator.evaluateQPPAtCutoff(Settings.getQPPMethod(), queries, Settings.getNumWanted());
         }
         catch (Exception ex) {
             ex.printStackTrace();

@@ -33,7 +33,6 @@ class CorrelationPair {
 }
 
 public class QPPLinearRegressor {
-    static SettingsLoader       loader;
     Properties                  prop;
     int                         partition;
     static List<TRECQuery>      trainQueries;
@@ -111,11 +110,11 @@ public class QPPLinearRegressor {
             args[0] = "qpp.properties";
         }
 
-        loader.init(args[0]);
-        QPPEvaluator qppEvaluator = new QPPEvaluator(loader.getProp(),
-                loader.getCorrelationMetric(), loader.getSearcher(),
-                loader.getNumWanted());
-        QPPLinearRegressor qppreg = new QPPLinearRegressor(loader.getProp(), loader.getTrainPercentage());
+        Settings.init(args[0]);
+        QPPEvaluator qppEvaluator = new QPPEvaluator(Settings.getProp(),
+                Settings.getCorrelationMetric(), Settings.getSearcher(),
+                Settings.getNumWanted());
+        QPPLinearRegressor qppreg = new QPPLinearRegressor(Settings.getProp(), Settings.getTrainPercentage());
 
         List<TRECQuery> queries = qppEvaluator.constructQueries();
         // create train:test splits
@@ -126,17 +125,17 @@ public class QPPLinearRegressor {
         Similarity sim = new LMDirichletSimilarity(1000);
 
         /* Experiment configurations */
-        final int nwanted = loader.getNumWanted();
-        final int qppTopK = loader.getQppTopK();
-        QPPMethod method = loader.getQPPMethod();
+        final int nwanted = Settings.getNumWanted();
+        final int qppTopK = Settings.getQppTopK();
+        QPPMethod method = Settings.getQPPMethod();
 
         // learn individual regressor learning parameters for individual qpp estimators
-        System.out.println(String.format("Fitting linear regression on %s scores", SettingsLoader.getRetEvalMetric()));
-        qppreg.fit(qppEvaluator, method, SettingsLoader.getRetEvalMetric(), sim, nwanted);
+        System.out.println(String.format("Fitting linear regression on %s scores", Settings.getRetEvalMetric()));
+        qppreg.fit(qppEvaluator, method, Settings.getRetEvalMetric(), sim, nwanted);
 
         // predict test set values based on individual learning parameters
-        CorrelationPair cp = qppreg.predict(qppEvaluator, method, SettingsLoader.getRetEvalMetric(), sim, nwanted);
+        CorrelationPair cp = qppreg.predict(qppEvaluator, method, Settings.getRetEvalMetric(), sim, nwanted);
         System.out.println(String.format("CORRELATION (%s): %.4f %.4f",
-                loader.getCorrelationMetric().name(), cp.withoutTransformation, cp.withTransformation));
+                Settings.getCorrelationMetric().name(), cp.withoutTransformation, cp.withTransformation));
     }
 }
