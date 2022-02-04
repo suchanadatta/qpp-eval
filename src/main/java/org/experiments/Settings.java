@@ -20,7 +20,7 @@ import org.qpp.*;
 
 
 public class Settings {
-
+    public static final int SEED = 314159; // first six digits of pi - a beautiful seed!
     static Map<String, QPPCorrelationMetric> corrMetrics;
     static Map<String, QPPMethod>            qppMethods;
     static Map<String, Metric>               retEvalMetrics;

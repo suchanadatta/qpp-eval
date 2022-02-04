@@ -3,6 +3,7 @@ package org.qpp;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
+import org.experiments.Settings;
 import org.feedback.RelevanceModelConditional;
 import org.feedback.RelevanceModelIId;
 import org.evaluator.RetrievedResults;
@@ -20,8 +21,7 @@ public class UEFSpecificity implements QPPMethod {
     BaseIDFSpecificity qppMethod;
     RelevanceModelIId rlm;
     
-    static final int SEED = 314159; // first six digits of pi - a beautiful seed!
-    static Random rnd = new Random(SEED);
+    static Random rnd = new Random(Settings.SEED);
     static final int NUM_SAMPLES = 10;
 
     public UEFSpecificity(BaseIDFSpecificity qppMethod) {

@@ -40,8 +40,7 @@ public class QPPPolynomialRegressor {
     static List<RegressionLearner> regressionLearner;
     static QPPCorrelationMetric correlationMetric;
     
-    static final int SEED = 314159; // first six digits of pi - a beautiful seed!
-    static Random rnd = new Random(SEED);
+    static Random rnd = new Random(Settings.SEED);
     
     public QPPPolynomialRegressor(Properties prop, int partition) {
         this.prop = prop;

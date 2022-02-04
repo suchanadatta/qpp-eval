@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Random;
 
 public class CorrelationAcrossMetrics {
-    static final int SEED = 31416;
 
     public static void main(String[] args) {
         if (args.length < 1) {
@@ -29,7 +28,7 @@ public class CorrelationAcrossMetrics {
                     Boolean.parseBoolean(Settings.getProp().getProperty("transform_scores", "false"));
 
             if (toTransform) {
-                Collections.shuffle(queries, new Random(SEED));
+                Collections.shuffle(queries, new Random(Settings.SEED));
                 int splitIndex = (int) (queries.size() * Settings.getTrainPercentage() / 100);
                 List<TRECQuery> trainQueries = queries.subList(0, splitIndex);
                 List<TRECQuery> testQueries = queries.subList(splitIndex, queries.size());

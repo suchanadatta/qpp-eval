@@ -264,17 +264,6 @@ public class QPPEvaluator {
         return qppMethods;
     }
 
-    public void relativeSystemRanksAcrossSims(List<TRECQuery> queries) throws Exception {
-        relativeSystemRanksAcrossSims(queries, numWanted);
-    }
-
-    public void relativeSystemRanksAcrossSims(List<TRECQuery> queries, int cutoff) throws Exception {
-        Metric[] metricForEval = Metric.values();
-        for (Metric m: metricForEval) {
-            relativeSystemRanksAcrossSims(m, queries, cutoff);
-        }
-    }
-
     public void relativeSystemRanksAcrossMetrics(List<TRECQuery> queries) throws Exception {
         Similarity[] sims = modelsToTest();
         for (Similarity sim: sims) {
@@ -440,17 +429,117 @@ public class QPPEvaluator {
     }
 
     /*
+        Compute how much system rankings change with different settings for metric (AP, P@5)
+        or retrieval model used. For each metric compute the average rank correlation over a range of
+        different retrieval models. For stability, these numbers should be high.
+     */
+    public void relativeSystemRanksAcrossSims(Metric m,
+                                              List<TRECQuery> trainQueries,
+                                              List<TRECQuery> testQueries
+                                              ) throws Exception {
+        int i, j, k;
+        int cutoff = Settings.getNumWanted();
+
+        Similarity[] sims = corrAcrossModels();
+        QPPMethod[] qppMethods = qppMethods();
+
+        // Rho and tau scores across the QPP methods.
+        double[][] corr_scores = new double[sims.length][qppMethods.length];
+        double rankcorr;
+        List<TRECQuery> queries = new ArrayList<>(trainQueries);
+        queries.addAll(testQueries);
+
+        int numQueries = queries.size();
+        Map<Integer, double[]> evaluatedMetricValuesSims = new HashMap<>();
+
+        for (i=0; i<sims.length; i++) {
+            double[] evaluatedMetricValues = evaluate(queries, sims[i], m, cutoff);
+            evaluatedMetricValuesSims.put(i, evaluatedMetricValues);
+            System.out.println(String.format("Average %s (IR-model: %s, Metric: %s): %.4f",
+                    m.toString(), sims[i].toString(), m.toString(),
+                    StatUtils.mean(evaluatedMetricValues)));
+        }
+
+        // Learn the map for each ret-eval-metric : qpp estimate pair to be used later during prediction
+        Map<String, SimpleRegression> transformerMaps = new HashMap<>();
+        for (QPPMethod qppMethod: qppMethods) {
+            for (i=0; i<sims.length; i++) {
+                Similarity sim = sims[i];
+                System.out.println(String.format("Fitting linear regression on %s scores and %s estimates",
+                        m.name(), qppMethod.name()));
+                SimpleRegression scoreTransformerModel = fit(trainQueries, qppMethod, sim, m);
+                transformerMaps.put(String.format("%s:%d", qppMethod.name(), i), scoreTransformerModel);
+            }
+        }
+
+        k = 0;
+        // Now use these score transformers on the test set...
+        SimpleRegression scoreTransformerModel = null;
+        double[] evaluatedMetricValues = null;
+        double[] qppEstimates = null;
+
+        for (QPPMethod qppMethod: qppMethods) {
+            for (i = 0; i < sims.length-1; i++) {
+                // get the transformer for the correct pair
+                scoreTransformerModel =
+                        transformerMaps.get(String.format("%s:%d", qppMethod.name(), i));
+
+                // Get the ret-eval scores
+                evaluatedMetricValues = evaluatedMetricValuesSims.get(i);
+                qppEstimates = getQPPEstimates(qppMethod, testQueries,
+                        evaluatedMetricValues, m, scoreTransformerModel);
+
+                // Now compute the correlation after a minmax transform
+                qppEstimates = MinMaxNormalizer.normalize(qppEstimates);
+                rankcorr = correlationMetric.correlation(evaluatedMetricValues, qppEstimates);
+
+                corr_scores[i][k] = rankcorr;
+
+                for (j = i+1; j < sims.length; j++) {
+                    scoreTransformerModel =
+                            transformerMaps.get(String.format("%s:%d", qppMethod.name(), j));
+
+                    // Get the ret-eval scores
+                    evaluatedMetricValues = evaluatedMetricValuesSims.get(j);
+                    qppEstimates = getQPPEstimates(qppMethod, testQueries,
+                            evaluatedMetricValues, m, scoreTransformerModel);
+
+                    // Now compute the correlation after a minmax transform
+                    qppEstimates = MinMaxNormalizer.normalize(qppEstimates);
+                    rankcorr = correlationMetric.correlation(evaluatedMetricValues, qppEstimates);
+
+                    // Now compute the correlation after a minmax transform
+                    qppEstimates = MinMaxNormalizer.normalize(qppEstimates);
+                    rankcorr = correlationMetric.correlation(evaluatedMetricValues, qppEstimates);
+
+                    corr_scores[j][k] = rankcorr;
+                }
+            }
+            k++;
+        }
+
+        System.out.println("Contingency for metric: " + m.toString());
+        for (i = 0; i < sims.length-1; i++) {
+            //System.out.println("Rho values using " + sims[i].toString() + ", " + m.name() + " as GT: " + getRowVector_Str(rho_scores, i));
+            for (j = i + 1; j < sims.length; j++) {
+                //System.out.println("Rho values using " + sims[i].toString() + ", " + m.name() + " as GT: " + getRowVector_Str(rho_scores, i));
+                double inter_corr = rankCorrAcrossCutOffs(corr_scores, i, j, new KendalCorrelation());
+                System.out.printf("%s %s/%s: %s = %.4f \n",
+                        m.name(), sims[i].toString(), sims[j].toString(), correlationMetric.name(), inter_corr);
+            }
+        }
+    }
+
+    /*
     Compute how much system rankings change with different settings for metric (AP, P@5)
     or retrieval model used. For each metric compute the average rank correlation over a range of
     different retrieval models. For stability, these numbers should be high.
      */
-    public void relativeSystemRanksAcrossSims(Metric m, List<TRECQuery> queries, int cutoff) throws Exception {
+    public void relativeSystemRanksAcrossSims(Metric m, List<TRECQuery> queries) throws Exception {
         int i, j, k;
-
+        int cutoff = Settings.getNumWanted();
         Similarity[] sims = corrAcrossModels();
-        System.out.println("Total models : " + sims.length);
         QPPMethod[] qppMethods = qppMethods();
-        System.out.println("QPP METHODS : " + qppMethods.length);
 
         // Rho and tau scores across the QPP methods.
         double[][] corr_scores = new double[sims.length][qppMethods.length];

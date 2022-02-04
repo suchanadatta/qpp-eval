@@ -43,8 +43,7 @@ public class QPPLinearRegressor {
     static String               resFileTest;
     RegressionLearner lr;
 
-    static final int SEED = 314159; // first six digits of pi - a beautiful seed!
-    static Random rnd = new Random(SEED);
+    static Random rnd = new Random(Settings.SEED);
     
     public QPPLinearRegressor(Properties prop, int partition) {
         this.prop = prop;
