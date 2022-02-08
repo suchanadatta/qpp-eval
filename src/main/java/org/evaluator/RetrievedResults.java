@@ -63,7 +63,6 @@ public class RetrievedResults implements Comparable<RetrievedResults> {
         float prec = 0;
         int numRel = relInfo.numRel;
         int numRelSeen = 0;
-//        System.out.println("############## : " + this.rtuples.size());
         for (ResultTuple tuple : this.rtuples) {
             if (tuple.rel < 1)
                 continue;

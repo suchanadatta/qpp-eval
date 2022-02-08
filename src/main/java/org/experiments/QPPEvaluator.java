@@ -99,7 +99,7 @@ public class QPPEvaluator {
     }
     
     public static Similarity[] corrAcrossModels() {
-        return new Similarity[]{
+        return new Similarity[] {
             new LMJelinekMercerSimilarity(0.3f),
             new LMJelinekMercerSimilarity(0.6f),
             new BM25Similarity(0.7f, 0.3f),
@@ -143,7 +143,7 @@ public class QPPEvaluator {
         for (TRECQuery query : queries) {
             TopDocs topDocs = retrieve(query, sim, cutoff);
             if (topDocsMap != null)
-                topDocsMap.put(query.title, topDocs);
+                topDocsMap.put(query.id, topDocs);
             saveRetrievedTuples(bw, query, topDocs, sim.toString());
         }
         bw.flush();
@@ -165,7 +165,7 @@ public class QPPEvaluator {
 
         for (TRECQuery query : queries) {
             TopDocs topDocs = retrieve(query, sim, cutoff);
-            topDocsMap.put(query.title, topDocs);
+            topDocsMap.put(query.id, topDocs);
             saveRetrievedTuples(bw, query, topDocs, sim.toString());
         }
         bw.flush();
@@ -183,14 +183,16 @@ public class QPPEvaluator {
     }
 
     public double[] getQPPEstimates(
+            Map<String, TopDocs> topDocsMap,
             QPPMethod qppMethod,
             List<TRECQuery> queries,
             double[] evaluatedMetricValues,
             Metric m) throws Exception {
-        return getQPPEstimates(qppMethod, queries, evaluatedMetricValues, m, null);
+        return getQPPEstimates(topDocsMap, qppMethod, queries, evaluatedMetricValues, m, null);
     }
 
     public double[] getQPPEstimates(
+            Map<String, TopDocs> topDocsMap,
             QPPMethod qppMethod,
             List<TRECQuery> queries,
             double[] evaluatedMetricValues,
@@ -205,9 +207,9 @@ public class QPPEvaluator {
         int i = 0;
         for (TRECQuery query : queries) {
             RetrievedResults rr = evaluator.getRetrievedResultsForQueryId(query.id);
-            TopDocs topDocs = topDocsMap.get(query.title);
+            TopDocs topDocs = topDocsMap.get(query.id);
             if (topDocs==null) {
-                System.err.println("No Topdocs found for query <" + query.title + ">");
+                System.err.println(String.format("No Topdocs found for query %s", query.id));
                 estimatedScore = 0;
             }
             else
@@ -222,12 +224,31 @@ public class QPPEvaluator {
     }
 
     public double evaluateQPPOnModel(
+            Map<String, TopDocs> topDocsMap,
             QPPMethod qppMethod,
             List<TRECQuery> queries,
             double[] evaluatedMetricValues,
             Metric m) throws Exception {
-        double[] estimates = getQPPEstimates(qppMethod, queries, evaluatedMetricValues, m);
+        double[] estimates = getQPPEstimates(topDocsMap, qppMethod, queries, evaluatedMetricValues, m);
         return correlationMetric.correlation(evaluatedMetricValues, estimates);
+    }
+
+    /* Returns a map of qid :-> ret_eval_value (e.g. AP value) --- works with regression */
+    public SimpleRegression evaluateQPPOnModel(
+            Map<String, TopDocs> topDocsMap,
+            QPPMethod qppMethod,
+            List<TRECQuery> queries,
+            double[] evaluatedMetricValues,
+            Metric m, boolean transform) throws Exception {
+
+        double[] estimates = getQPPEstimates(topDocsMap, qppMethod, queries, evaluatedMetricValues, m);
+
+        SimpleRegression reg = new SimpleRegression();
+        double[] n_pred = MinMaxNormalizer.normalize(estimates); // in [0, 1]
+        for (int i=0; i<evaluatedMetricValues.length; i++) {
+            reg.addData(n_pred[i], evaluatedMetricValues[i]);
+        }
+        return reg;
     }
 
     /* Returns a map of qid :-> ret_eval_value (e.g. AP value) --- works with regression */
@@ -236,15 +257,7 @@ public class QPPEvaluator {
             List<TRECQuery> queries,
             double[] evaluatedMetricValues,
             Metric m, boolean transform) throws Exception {
-
-        double[] estimates = getQPPEstimates(qppMethod, queries, evaluatedMetricValues, m);
-
-        SimpleRegression reg = new SimpleRegression();
-        double[] n_pred = MinMaxNormalizer.normalize(estimates); // in [0, 1]
-        for (int i=0; i<evaluatedMetricValues.length; i++) {
-            reg.addData(n_pred[i], evaluatedMetricValues[i]);
-        }
-        return reg;
+        return evaluateQPPOnModel(this.topDocsMap, qppMethod, queries, evaluatedMetricValues, m, transform);
     }
 
     public double measureCorrelation(double[] evaluatedMetricValues, double[] qppEstimates) {
@@ -293,12 +306,14 @@ public class QPPEvaluator {
         double[][] corr_scores = new double[metricForEval.length][qppMethods.length];
         double rankcorr;
 
-        int numQueries = queries.size();
         Map<Integer, double[]> preEvaluated = new HashMap<>();
+        Map<String, TopDocs> topDocsMap[] = new Map[metricForEval.length];
 
         for (i=0; i< metricForEval.length; i++) { // pre-evaluate for each metric
             Metric m = metricForEval[i];
             double[] evaluatedMetricValues = evaluate(queries, sim, m, cutoff);
+            topDocsMap[i] = this.topDocsMap; // store this map
+
             preEvaluated.put(i, evaluatedMetricValues);
             System.out.println(String.format("Average %s (IR-model: %s, Metric: %s): %.4f",
                     m.toString(), sim.toString(), m.toString(),
@@ -309,12 +324,12 @@ public class QPPEvaluator {
         for (QPPMethod qppMethod: qppMethods) {
             System.out.println(qppMethod.name());
             for (i = 0; i < metricForEval.length-1; i++) {
-                rankcorr = evaluateQPPOnModel(qppMethod, queries, preEvaluated.get(i), metricForEval[i]);
+                rankcorr = evaluateQPPOnModel(topDocsMap[i], qppMethod, queries, preEvaluated.get(i), metricForEval[i]);
                 System.out.println(rankcorr);
                 corr_scores[i][k] = rankcorr;
 
                 for (j = i+1; j < metricForEval.length; j++) {
-                    rankcorr = evaluateQPPOnModel(qppMethod, queries, preEvaluated.get(j), metricForEval[j]);
+                    rankcorr = evaluateQPPOnModel(topDocsMap[j], qppMethod, queries, preEvaluated.get(j), metricForEval[j]);
                     System.out.println(rankcorr);
                     corr_scores[j][k] = rankcorr;
                 }
@@ -334,11 +349,13 @@ public class QPPEvaluator {
         }
     }
 
-    private SimpleRegression fit(List<TRECQuery> trainQueries,
-             QPPMethod qppMethod, Similarity sim, Metric m) throws Exception {
+    private SimpleRegression fit(
+            Map<String, TopDocs> topDocsMap,
+            List<TRECQuery> trainQueries,
+            QPPMethod qppMethod, Similarity sim, Metric m) throws Exception {
 
         double[] retEvalMeasure = evaluate(trainQueries, sim, m, Settings.getNumWanted());
-        return evaluateQPPOnModel(qppMethod, trainQueries, retEvalMeasure, m, true);
+        return evaluateQPPOnModel(topDocsMap, qppMethod, trainQueries, retEvalMeasure, m, true);
     }
 
     public void relativeSystemRanksAcrossMetrics(Similarity sim,
@@ -355,10 +372,12 @@ public class QPPEvaluator {
 
         int numQueries = testQueries.size();
         Map<String, double[]> preEvaluated = new HashMap<>();
+        Map<String, TopDocs> topDocsMap[] = new Map[metricForEval.length];
 
         for (i=0; i< metricForEval.length; i++) { // pre-evaluate for each metric
             Metric m = metricForEval[i];
-            double[] evaluatedMetricValues = evaluate(testQueries, sim, m, cutoff);
+            double[] evaluatedMetricValues = evaluate(trainQueries, sim, m, cutoff);
+            topDocsMap[i] = this.topDocsMap;
             preEvaluated.put(metricForEval[i].name(), evaluatedMetricValues);
             System.out.println(String.format("Average %s (IR-model: %s, Metric: %s): %.4f",
                     m.toString(), sim.toString(), m.toString(),
@@ -368,10 +387,11 @@ public class QPPEvaluator {
         // Learn the map for each ret-eval-metric : qpp estimate pair to be used later during prediction
         Map<String, SimpleRegression> transformerMaps = new HashMap<>();
         for (QPPMethod qppMethod: qppMethods) {
-            for (Metric m: metricForEval) {
+            for (i=0; i< metricForEval.length; i++) {
+                Metric m = metricForEval[i];
                 System.out.println(String.format("Fitting linear regression on %s scores and %s estimates",
                         m.name(), qppMethod.name()));
-                SimpleRegression scoreTransformerModel = fit(trainQueries, qppMethod, sim, m);
+                SimpleRegression scoreTransformerModel = fit(topDocsMap[i], trainQueries, qppMethod, sim, m);
                 transformerMaps.put(String.format("%s:%s", qppMethod.name(), m.name()), scoreTransformerModel);
             }
         }
@@ -380,6 +400,17 @@ public class QPPEvaluator {
         SimpleRegression scoreTransformerModel = null;
         double[] evaluatedMetricValues = null;
         double[] qppEstimates = null;
+
+        preEvaluated.clear();
+        for (i=0; i< metricForEval.length; i++) { // pre-evaluate for each metric on the test set now
+            Metric m = metricForEval[i];
+            evaluatedMetricValues = evaluate(testQueries, sim, m, cutoff);
+            topDocsMap[i] = this.topDocsMap; // topdocs for each query for each metric
+            preEvaluated.put(metricForEval[i].name(), evaluatedMetricValues);
+            System.out.println(String.format("Average %s (IR-model: %s, Metric: %s): %.4f",
+                    m.toString(), sim.toString(), m.toString(),
+                    StatUtils.mean(evaluatedMetricValues)));
+        }
 
         k = 0;  // k is the index for a qpp method
         for (QPPMethod qppMethod: qppMethods) {
@@ -390,7 +421,7 @@ public class QPPEvaluator {
 
                 // Get the ret-eval scores
                 evaluatedMetricValues = preEvaluated.get(metricForEval[i].name());
-                qppEstimates = getQPPEstimates(qppMethod, testQueries,
+                qppEstimates = getQPPEstimates(topDocsMap[i], qppMethod, testQueries,
                         evaluatedMetricValues, metricForEval[i], scoreTransformerModel);
 
                 // Now compute the correlation after a minmax transform
@@ -405,7 +436,7 @@ public class QPPEvaluator {
 
                     // Get the ret-eval scores
                     evaluatedMetricValues = preEvaluated.get(metricForEval[j].name());
-                    qppEstimates = getQPPEstimates(qppMethod, testQueries,
+                    qppEstimates = getQPPEstimates(topDocsMap[j], qppMethod, testQueries,
                             evaluatedMetricValues, metricForEval[j], scoreTransformerModel);
 
                     // Now compute the correlation after a minmax transform
@@ -446,15 +477,13 @@ public class QPPEvaluator {
         // Rho and tau scores across the QPP methods.
         double[][] corr_scores = new double[sims.length][qppMethods.length];
         double rankcorr;
-        List<TRECQuery> queries = new ArrayList<>(trainQueries);
-        queries.addAll(testQueries);
 
-        int numQueries = queries.size();
-        Map<Integer, double[]> evaluatedMetricValuesSims = new HashMap<>();
+        Map<String, TopDocs> topDocsMap[] = new Map[sims.length];
+        double[] evaluatedMetricValues = null;
 
         for (i=0; i<sims.length; i++) {
-            double[] evaluatedMetricValues = evaluate(queries, sims[i], m, cutoff);
-            evaluatedMetricValuesSims.put(i, evaluatedMetricValues);
+            evaluatedMetricValues = evaluate(trainQueries, sims[i], m, cutoff);
+            topDocsMap[i] = this.topDocsMap;
             System.out.println(String.format("Average %s (IR-model: %s, Metric: %s): %.4f",
                     m.toString(), sims[i].toString(), m.toString(),
                     StatUtils.mean(evaluatedMetricValues)));
@@ -467,7 +496,7 @@ public class QPPEvaluator {
                 Similarity sim = sims[i];
                 System.out.println(String.format("Fitting linear regression on %s scores and %s estimates",
                         m.name(), qppMethod.name()));
-                SimpleRegression scoreTransformerModel = fit(trainQueries, qppMethod, sim, m);
+                SimpleRegression scoreTransformerModel = fit(topDocsMap[i], trainQueries, qppMethod, sim, m);
                 transformerMaps.put(String.format("%s:%d", qppMethod.name(), i), scoreTransformerModel);
             }
         }
@@ -475,8 +504,13 @@ public class QPPEvaluator {
         k = 0;
         // Now use these score transformers on the test set...
         SimpleRegression scoreTransformerModel = null;
-        double[] evaluatedMetricValues = null;
         double[] qppEstimates = null;
+        Map<Integer, double[]> evaluatedMetricValuesSims = new HashMap<>();
+        for (i = 0; i < sims.length; i++) {
+            evaluatedMetricValues = evaluate(testQueries, sims[i], m, cutoff);
+            topDocsMap[i] = this.topDocsMap;
+            evaluatedMetricValuesSims.put(i, evaluatedMetricValues);
+        }
 
         for (QPPMethod qppMethod: qppMethods) {
             for (i = 0; i < sims.length-1; i++) {
@@ -486,11 +520,12 @@ public class QPPEvaluator {
 
                 // Get the ret-eval scores
                 evaluatedMetricValues = evaluatedMetricValuesSims.get(i);
-                qppEstimates = getQPPEstimates(qppMethod, testQueries,
+                qppEstimates = getQPPEstimates(topDocsMap[i], qppMethod, testQueries,
                         evaluatedMetricValues, m, scoreTransformerModel);
 
                 // Now compute the correlation after a minmax transform
                 qppEstimates = MinMaxNormalizer.normalize(qppEstimates);
+                System.out.println(evaluatedMetricValues.length + ", " + qppEstimates.length);
                 rankcorr = correlationMetric.correlation(evaluatedMetricValues, qppEstimates);
 
                 corr_scores[i][k] = rankcorr;
@@ -501,7 +536,7 @@ public class QPPEvaluator {
 
                     // Get the ret-eval scores
                     evaluatedMetricValues = evaluatedMetricValuesSims.get(j);
-                    qppEstimates = getQPPEstimates(qppMethod, testQueries,
+                    qppEstimates = getQPPEstimates(topDocsMap[j], qppMethod, testQueries,
                             evaluatedMetricValues, m, scoreTransformerModel);
 
                     // Now compute the correlation after a minmax transform
@@ -547,9 +582,11 @@ public class QPPEvaluator {
 
         int numQueries = queries.size();
         Map<Integer, double[]> evaluatedMetricValuesSims = new HashMap<>();
+        Map<String, TopDocs> topDocsMap[] = new Map[sims.length];
 
         for (i=0; i<sims.length; i++) {
             double[] evaluatedMetricValues = evaluate(queries, sims[i], m, cutoff);
+            topDocsMap[i] = this.topDocsMap;
             evaluatedMetricValuesSims.put(i, evaluatedMetricValues);
             System.out.println(String.format("Average %s (IR-model: %s, Metric: %s): %.4f",
                     m.toString(), sims[i].toString(), m.toString(),
@@ -558,14 +595,13 @@ public class QPPEvaluator {
 
         k = 0;
         for (QPPMethod qppMethod: qppMethods) {
-            System.out.println("#################### : " + qppMethod.name());
             for (i = 0; i < sims.length-1; i++) {
-                rankcorr = evaluateQPPOnModel(qppMethod, queries, evaluatedMetricValuesSims.get(i), m);
+                rankcorr = evaluateQPPOnModel(topDocsMap[i], qppMethod, queries, evaluatedMetricValuesSims.get(i), m);
                 System.out.println(rankcorr);
                 corr_scores[i][k] = rankcorr;
 
                 for (j = i+1; j < sims.length; j++) {
-                    rankcorr = evaluateQPPOnModel(qppMethod, queries, evaluatedMetricValuesSims.get(j), m);
+                    rankcorr = evaluateQPPOnModel(topDocsMap[j], qppMethod, queries, evaluatedMetricValuesSims.get(j), m);
                     System.out.println(rankcorr);
                     corr_scores[j][k] = rankcorr;
                 }
@@ -607,7 +643,7 @@ public class QPPEvaluator {
                 int cutoff = (i+1)*cutOffStep;
                 for (Similarity sim : sims) {
                     double[] evaluatedMetricValues = evaluate(queries, sim, m, cutoff);
-                    double rankcorr = evaluateQPPOnModel(qppMethod, queries, evaluatedMetricValues, m);
+                    double rankcorr = evaluateQPPOnModel(this.topDocsMap, qppMethod, queries, evaluatedMetricValues, m);
                     System.out.printf("Model: %s, Metric %s: QPP-corr (%s) = %.4f%n",
                             sim.toString(), m.toString(), rankcorr);
                 }
@@ -627,7 +663,7 @@ public class QPPEvaluator {
                         m.toString(), sim.toString(), m.toString(),
                         StatUtils.mean(evaluatedMetricValues)));
 
-                double rankcorr = evaluateQPPOnModel(qppMethod, queries, evaluatedMetricValues, m);
+                double rankcorr = evaluateQPPOnModel(this.topDocsMap, qppMethod, queries, evaluatedMetricValues, m);
                 System.out.printf("QPP-method: %s Model: %s, Metric %s: %s = %.4f%n", qppMethod.name(),
                         sim.toString(), m.toString(), correlationMetric.name(), rankcorr);
             }

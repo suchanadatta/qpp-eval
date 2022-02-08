@@ -1,34 +1,38 @@
 #!/bin/bash
 
-if [ $# -lt 3 ]
+if [ $# -lt 2 ]
 then
-	echo "usage: $0 <num docs to retrieve (e.g. 100)> <num-top docs for qpp-estimation (e.g. 50) <metric (r/rho/tau/qsim/qsim_strict/pairacc)>"
+	echo "usage: $0 <metric (r/rho/tau/qsim/qsim_strict/pairacc/rmse)> <ret-eval specific regression (only for rmse; [true/false])>"
 	exit
 fi
 
-METRIC=$3
+METRIC=$1
+APPLY_REG=$2
+
+PROP_FILE=qpp_across_models.properties
+NUMDOCS=100
+K=50
 
 #Change this path to index/ (committed on git) after downloading the Lucene indexed
 #TREC disks 4/5 index from https://rsgqglln.tkhcloudstorage.com/item/c59086c6b00d41e79d53c58ad66bc21f
 INDEXDIR=/Users/debasis/research/common/trecd45/index/
+QRELS=data/qrels.robust.all
 
-QRELS=data/qrels.trec8.adhoc
-
-cat > qpp.properties << EOF1
-
+cat > $PROP_FILE << EOF1
 index.dir=$INDEXDIR
-query.file=data/topics.401-450.xml
-res.file=res_
+query.file=data/topics.robust.all
 qrels.file=$QRELS
-retrieve.num_wanted=$1
-qpp.numtopdocs=$2
+retrieve.num_wanted=$NUMDOCS
+qpp.numtopdocs=$K
 qpp.metric=$METRIC
+res.file=/tmp/res
+transform_scores=$APPLY_REG
+qpp.splits=80
 
 EOF1
 
-mvn exec:java@across_models -Dexec.args="qpp.properties" > across_models.$METRIC.txt
-
-rm qpp.properties
+mvn exec:java@across_models -Dexec.args=$PROP_FILE #> across_models.$METRIC.txt
+#rm $PROP_FILE
 
 #echo "$METHOD $METRIC"
 #echo "BM25 (k=0.5, b=1) BM25 (k=1.5, b=0.75) LM-Dir (1000) LM-JM (0.6)"

@@ -12,7 +12,7 @@ public class CorrelationAcrossModels {
     public static void main(String[] args) {
         if (args.length < 1) {
             args = new String[1];
-            args[0] = "qpp.properties";
+            args[0] = "qpp_across_models.properties";
         }
 
         try {

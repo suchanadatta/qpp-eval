@@ -70,9 +70,9 @@ public class QPPScoresFileWriter {
                 for (QPPMethod qppMethod: qppMethods) {
                     System.out.println(String.format("computing %s scores for qid %s", qppMethod.name(), query.id));
                     RetrievedResults rr = evaluator.getRetrievedResultsForQueryId(query.id);
-                    TopDocs topDocs = topDocsMap.get(query.title);
+                    TopDocs topDocs = topDocsMap.get(query.id);
                     if (topDocs==null) {
-                        System.err.println("No Topdocs found for query <" + query.title + ">");
+                        System.err.println(String.format("No Topdocs found for query %s", query.id.trim()));
                         continue;
                     }
                     float qppEstimate = (float)qppMethod.computeSpecificity(query.getLuceneQueryObj(), rr, topDocs, qppTopK);
