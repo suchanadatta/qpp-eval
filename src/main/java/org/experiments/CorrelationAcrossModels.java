@@ -26,11 +26,12 @@ public class CorrelationAcrossModels {
             boolean toTransform = Settings.getCorrelationMetric().name().equals("rmse") &&
                     Boolean.parseBoolean(Settings.getProp().getProperty("transform_scores", "false"));
 
+            Collections.shuffle(queries, new Random(Settings.SEED));
+            int splitIndex = (int) (queries.size() * Settings.getTrainPercentage() / 100);
+            List<TRECQuery> trainQueries = queries.subList(0, splitIndex);
+            List<TRECQuery> testQueries = queries.subList(splitIndex, queries.size());
+
             if (toTransform) {
-                Collections.shuffle(queries, new Random(Settings.SEED));
-                int splitIndex = (int) (queries.size() * Settings.getTrainPercentage() / 100);
-                List<TRECQuery> trainQueries = queries.subList(0, splitIndex);
-                List<TRECQuery> testQueries = queries.subList(splitIndex, queries.size());
 
                 for (Metric m: metricForEval) {
                     qppEvaluator.relativeSystemRanksAcrossSims(m, trainQueries, testQueries);
@@ -38,7 +39,7 @@ public class CorrelationAcrossModels {
             }
             else {
                 for (Metric m: metricForEval) {
-                    qppEvaluator.relativeSystemRanksAcrossSims(m, queries);
+                    qppEvaluator.relativeSystemRanksAcrossSims(m, testQueries);
                 }
             }
         }

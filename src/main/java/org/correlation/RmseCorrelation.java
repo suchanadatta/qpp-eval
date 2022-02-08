@@ -24,12 +24,9 @@ public class RmseCorrelation implements QPPCorrelationMetric {
 
     private double rmse(double[] truth, double[] pred) {
         double rmse = 0;
-        StringBuffer buff = new StringBuffer("pairs: ");
         for(int i=0; i < truth.length; i++) {
-            buff.append(String.format("(%.4f, %.4f) ", pred[i], truth[i]));
             rmse += Math.pow(pred[i] - truth[i], 2);
         }
-        System.out.println(buff.toString());
         return (double)Math.sqrt(rmse/(double)truth.length);
     }
     

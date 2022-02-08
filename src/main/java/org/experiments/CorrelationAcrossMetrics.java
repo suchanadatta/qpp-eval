@@ -27,17 +27,17 @@ public class CorrelationAcrossMetrics {
             boolean toTransform = Settings.getCorrelationMetric().name().equals("rmse") &&
                     Boolean.parseBoolean(Settings.getProp().getProperty("transform_scores", "false"));
 
-            if (toTransform) {
-                Collections.shuffle(queries, new Random(Settings.SEED));
-                int splitIndex = (int) (queries.size() * Settings.getTrainPercentage() / 100);
-                List<TRECQuery> trainQueries = queries.subList(0, splitIndex);
-                List<TRECQuery> testQueries = queries.subList(splitIndex, queries.size());
+            Collections.shuffle(queries, new Random(Settings.SEED));
+            int splitIndex = (int) (queries.size() * Settings.getTrainPercentage() / 100);
+            List<TRECQuery> trainQueries = queries.subList(0, splitIndex);
+            List<TRECQuery> testQueries = queries.subList(splitIndex, queries.size());
 
+            if (toTransform) {
                 // for a single metric if want to use different cutoff (e.g. ap@10/ap@100...)
                 qppEvaluator.relativeSystemRanksAcrossMetrics(Settings.getRetModel(), trainQueries, testQueries, cutOff);
             }
             else {
-                qppEvaluator.relativeSystemRanksAcrossMetrics(Settings.getRetModel(), queries, cutOff);
+                qppEvaluator.relativeSystemRanksAcrossMetrics(Settings.getRetModel(), testQueries, cutOff);
             }
         }
         catch (Exception ex) {
