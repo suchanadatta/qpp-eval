@@ -1,13 +1,14 @@
 #!/bin/bash
 
-if [ $# -lt 2 ]
+if [ $# -lt 3 ]
 then
-	echo "usage: $0 <metric (r/rho/tau/qsim/qsim_strict/pairacc/rmse)> <ret-eval specific regression (only for rmse; [true/false])>"
+	echo "usage: $0 <IR metric (ap,p_10,recall,ndcg)> <metric (r/rho/tau/qsim/qsim_strict/pairacc/rmse)> <ret-eval specific regression (only for rmse; [true/false])>"
 	exit
 fi
 
-METRIC=$1
-APPLY_REG=$2
+IR_METRIC=$1
+METRIC=$2
+APPLY_REG=$3
 
 PROP_FILE=qpp_across_models.properties
 NUMDOCS=100
@@ -28,10 +29,11 @@ qpp.metric=$METRIC
 res.file=/tmp/res
 transform_scores=$APPLY_REG
 qpp.splits=80
+reteval.metric=$IR_METRIC
 
 EOF1
 
-mvn exec:java@across_models -Dexec.args=$PROP_FILE #> across_models.$METRIC.txt
+mvn exec:java@across_models -Dexec.args=$PROP_FILE > across_models.$IR_METRIC.$METRIC.$APPLY_REG.txt
 #rm $PROP_FILE
 
 #echo "$METHOD $METRIC"

@@ -107,7 +107,7 @@ public class QPPEvaluator {
             new BM25Similarity(0.3f, 0.7f),
             new LMDirichletSimilarity(100),
             new LMDirichletSimilarity(500),
-            new LMDirichletSimilarity(1000),            
+            new LMDirichletSimilarity(1000),
         };
     }
 
@@ -347,6 +347,14 @@ public class QPPEvaluator {
                         sim.toString(), metricForEval[i].name(), metricForEval[j].name(), correlationMetric.name(), inter_corr);
             }
         }
+    }
+
+    private SimpleRegression fit(
+            List<TRECQuery> trainQueries,
+            QPPMethod qppMethod, Similarity sim, Metric m) throws Exception {
+
+        double[] retEvalMeasure = evaluate(trainQueries, sim, m, Settings.getNumWanted());
+        return evaluateQPPOnModel(qppMethod, trainQueries, retEvalMeasure, m, true);
     }
 
     private SimpleRegression fit(
@@ -651,9 +659,38 @@ public class QPPEvaluator {
         }
     }
 
-    public void evaluateQPPAtCutoff(QPPMethod qppMethod, List<TRECQuery> queries, int cutoff) throws Exception {
+    public void evaluateQPPAtCutoff(QPPMethod qppMethod,
+                                    List<TRECQuery> trainQueries,
+                                    List<TRECQuery> testQueries,
+                                    int cutoff) throws Exception {
+
         Metric[] metricForEval = Metric.values();
         Similarity[] sims = modelsToTest();
+        Map<String, SimpleRegression> transformerMaps = new HashMap<>();
+
+        // Train regressors on all combinations of 'm' and 'sim'
+        for (Metric m : metricForEval) {
+            for (Similarity sim : sims) {
+                System.out.println(String.format(
+                        "Training regression model for (Similarity: %s, Metric: %s)...", sim.toString(), m.name())
+                );
+
+                SimpleRegression regModel = fit(trainQueries, qppMethod, sim, m);
+                transformerMaps.put(String.format("%s:%s", m.name(), sim.toString()), regModel);
+            }
+        }
+
+        // Now, testing time begins! yay!!
+        evaluateQPPAtCutoff(qppMethod, testQueries, cutoff, transformerMaps);
+    }
+
+    public void evaluateQPPAtCutoff(QPPMethod qppMethod,
+                                    List<TRECQuery> queries,
+                                    int cutoff,
+                                    Map<String, SimpleRegression> transformerMaps) throws Exception {
+        Metric[] metricForEval = Metric.values();
+        Similarity[] sims = modelsToTest();
+        double[] estimates = null;
 
         for (Metric m : metricForEval) {
             for (Similarity sim : sims) {
@@ -663,11 +700,24 @@ public class QPPEvaluator {
                         m.toString(), sim.toString(), m.toString(),
                         StatUtils.mean(evaluatedMetricValues)));
 
-                double rankcorr = evaluateQPPOnModel(this.topDocsMap, qppMethod, queries, evaluatedMetricValues, m);
+                if (transformerMaps != null) {
+                    SimpleRegression reg = transformerMaps.get(
+                            String.format("%s:%s", m.name(), sim.toString()));
+                    estimates = getQPPEstimates(topDocsMap, qppMethod, queries, evaluatedMetricValues, m, reg);
+                }
+                else {
+                    estimates = getQPPEstimates(topDocsMap, qppMethod, queries, evaluatedMetricValues, m);
+                }
+                double rankcorr = correlationMetric.correlation(evaluatedMetricValues, estimates);
+
                 System.out.printf("QPP-method: %s Model: %s, Metric %s: %s = %.4f%n", qppMethod.name(),
                         sim.toString(), m.toString(), correlationMetric.name(), rankcorr);
             }
         }
+    }
+
+    public void evaluateQPPAtCutoff(QPPMethod qppMethod, List<TRECQuery> queries, int cutoff) throws Exception {
+        evaluateQPPAtCutoff(qppMethod, queries, cutoff, null);
     }
 
     double rankCorrAcrossCutOffs(double[][] rankCorrMatrix, int row_a, int row_b,
@@ -723,10 +773,29 @@ public class QPPEvaluator {
                     Settings.getProp(), Settings.getCorrelationMetric(),
                     Settings.getSearcher(), Settings.getNumWanted());
             List<TRECQuery> queries = qppEvaluator.constructQueries();
-            System.out.println("Queries : " + queries.size());
-            System.out.println("QPP method loaded : " + Settings.getQPPMethod().name() +
-                    "\tMeasure specificity on docs :" + Settings.getNumWanted());
-            qppEvaluator.evaluateQPPAtCutoff(Settings.getQPPMethod(), queries, Settings.getNumWanted());
+
+            boolean toTransform = Settings.getCorrelationMetric().name().equals("rmse") &&
+                    Boolean.parseBoolean(Settings.getProp().getProperty("transform_scores", "false"));
+
+            Collections.shuffle(queries, new Random(Settings.SEED));
+            int splitIndex = (int) (queries.size() * Settings.getTrainPercentage() / 100);
+            List<TRECQuery> trainQueries = queries.subList(0, splitIndex);
+            List<TRECQuery> testQueries = queries.subList(splitIndex, queries.size());
+
+            if (!toTransform) {
+                System.out.println(String.format(
+                        "#Train Queries : %d, #Test queries: %d", trainQueries.size(), testQueries.size()));
+                System.out.println("QPP method loaded : " + Settings.getQPPMethod().name() +
+                        "\tMeasure specificity on docs :" + Settings.getNumWanted());
+                qppEvaluator.evaluateQPPAtCutoff(Settings.getQPPMethod(), testQueries, Settings.getNumWanted());
+            }
+            else {
+                System.out.println(String.format(
+                        "#Train Queries : %d, #Test queries: %d", trainQueries.size(), testQueries.size()));
+                System.out.println("QPP method loaded : " + Settings.getQPPMethod().name() +
+                        "\tMeasure specificity on docs :" + Settings.getNumWanted());
+                qppEvaluator.evaluateQPPAtCutoff(Settings.getQPPMethod(), trainQueries, testQueries, Settings.getNumWanted());
+            }
         }
         catch (Exception ex) {
             ex.printStackTrace();

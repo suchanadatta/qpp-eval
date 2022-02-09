@@ -17,7 +17,6 @@ public class CorrelationAcrossModels {
 
         try {
             Settings.init(args[0]);
-            Metric[] metricForEval = Metric.values();
 
             QPPEvaluator qppEvaluator = new QPPEvaluator(Settings.getProp(),
                     Settings.getCorrelationMetric(), Settings.getSearcher(), Settings.getNumWanted());
@@ -32,15 +31,10 @@ public class CorrelationAcrossModels {
             List<TRECQuery> testQueries = queries.subList(splitIndex, queries.size());
 
             if (toTransform) {
-
-                for (Metric m: metricForEval) {
-                    qppEvaluator.relativeSystemRanksAcrossSims(m, trainQueries, testQueries);
-                }
+                    qppEvaluator.relativeSystemRanksAcrossSims(Settings.getRetEvalMetric(), trainQueries, testQueries);
             }
             else {
-                for (Metric m: metricForEval) {
-                    qppEvaluator.relativeSystemRanksAcrossSims(m, testQueries);
-                }
+                    qppEvaluator.relativeSystemRanksAcrossSims(Settings.getRetEvalMetric(), testQueries);
             }
         }
         catch (Exception ex) {

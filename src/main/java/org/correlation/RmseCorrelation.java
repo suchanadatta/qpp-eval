@@ -16,10 +16,12 @@ import java.util.Map;
  */
 
 public class RmseCorrelation implements QPPCorrelationMetric {
-    
+
     @Override
     public double correlation(double[] gt, double[] pred) {
-        return rmse(gt, pred);
+        // in [0, 1]; no check to ensure that this may not be done twice!! but no harm in it!
+        double[] n_pred = MinMaxNormalizer.normalize(pred);
+        return rmse(gt, n_pred);
     }
 
     private double rmse(double[] truth, double[] pred) {

@@ -28,7 +28,7 @@ qpp.splits=80
 
 EOF1
 
-mvn exec:java@across_metrics -Dexec.args="qpp.properties" > across_metrics.$METRIC.txt
+mvn exec:java@across_metrics -Dexec.args="qpp.properties" > across_metrics.$MODEL.$METRIC.$APPLY_REG.txt
 
 #echo "$METHOD $METRIC"
 #echo "BM25 (k=0.5, b=1) BM25 (k=1.5, b=0.75) LM-Dir (1000) LM-JM (0.6)"

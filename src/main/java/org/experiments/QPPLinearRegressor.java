@@ -72,16 +72,9 @@ public class QPPLinearRegressor {
     public void fit(QPPEvaluator qppEvaluator,
                     QPPMethod qppMethod, Metric m,
                     Similarity sim, int nwanted) throws Exception {
-        fit(qppEvaluator.topDocsMap, qppEvaluator, qppMethod, m, sim, nwanted);
-    }
-
-    public void fit(Map<String, TopDocs> topDocsMap,
-                    QPPEvaluator qppEvaluator,
-                    QPPMethod qppMethod, Metric m,
-                    Similarity sim, int nwanted) throws Exception {
 
         double[] retEvalMeasure = qppEvaluator.evaluate(trainQueries, sim, m, nwanted);
-        double[] qppEstimates = qppEvaluator.getQPPEstimates(topDocsMap, qppMethod, trainQueries, retEvalMeasure, m);
+        double[] qppEstimates = qppEvaluator.getQPPEstimates(qppEvaluator.topDocsMap, qppMethod, trainQueries, retEvalMeasure, m);
 
         FitLinearRegressor fr = new FitLinearRegressor();
         fr.fit(retEvalMeasure, qppEstimates);
