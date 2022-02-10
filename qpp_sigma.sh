@@ -1,8 +1,9 @@
 #!/bin/bash
 
-if [ $# -lt 4 ]
+if [ $# -lt 5 ]
 then
     echo "Usage: " $0 " <following arguments in sequence>";
+    echo "Model (bm25/lmdir/lmjm)";
     echo "QPP Method (avgidf/nqc/wig/clarity/uef_nqc,/uef_wig/uef_clarity)";
     echo "Retrieval Eval Metric (ap, p_10, recall, ndcg)";
     echo "QPP eval Metric (r/rho/tau/qsim/qsim_strict/pairacc/class_acc/rmse)";
@@ -15,10 +16,12 @@ NUMWANTED=100
 NUMTOP=50
 SPLITS=80
 
-METHOD=$1
-RETEVAL_METRIC=$2
-METRIC=$3
-APPLY_REG=$4
+MODEL=$1
+METHOD=$2
+RETEVAL_METRIC=$3
+METRIC=$4
+APPLY_REG=$5
+
 INDEXDIR=/Users/debasis/research/common/trecd45/index/
 QRELS=data/qrels.robust.all
 QUERYFILE=data/topics.robust.all
@@ -28,6 +31,7 @@ cat > qpp.properties << EOF1
 index.dir=$INDEXDIR
 query.file=$QUERYFILE
 qrels.file=$QRELS
+ret.model=$MODEL
 res.file=outputs/lmdir.res
 res.train=outputs/train.res
 res.test=outputs/test.res

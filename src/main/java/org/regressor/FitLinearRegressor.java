@@ -21,7 +21,7 @@ public class FitLinearRegressor {
         re = new SimpleRegression();
     }   
     
-    public void fit(double[] gt, double[] pred) {
+    public void fit(double[] pred, double[] gt) {
         double[] n_pred = MinMaxNormalizer.normalize(pred); // in [0, 1]
         for (int i=0; i<gt.length; i++) {
             re.addData(n_pred[i], gt[i]);

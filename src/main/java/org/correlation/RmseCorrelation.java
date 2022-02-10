@@ -7,6 +7,7 @@
 package org.correlation;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -19,9 +20,12 @@ public class RmseCorrelation implements QPPCorrelationMetric {
 
     @Override
     public double correlation(double[] gt, double[] pred) {
+        double max = Arrays.stream(pred).max().getAsDouble();
+        if (max > 1) {
+            pred = MinMaxNormalizer.normalize(pred);
+        }
         // in [0, 1]; no check to ensure that this may not be done twice!! but no harm in it!
-        double[] n_pred = MinMaxNormalizer.normalize(pred);
-        return rmse(gt, n_pred);
+        return rmse(gt, pred);
     }
 
     private double rmse(double[] truth, double[] pred) {

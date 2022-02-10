@@ -80,7 +80,7 @@ public class QPPPolynomialRegressor {
                 lr.setMetric(m.name());
 
                 double [] corrMeasure = qppEvaluator.evaluate(trainQueries, sim, m, nwanted);
-                double [] qppEstimates = qppEvaluator.getQPPEstimates(qppEvaluator.topDocsMap, qppMethod, trainQueries, corrMeasure, m);
+                double [] qppEstimates = qppEvaluator.getQPPEstimates(qppEvaluator.topDocsMap, qppMethod, trainQueries, m);
 
                 FitPolyRegressor fpr = new FitPolyRegressor(degree);
                 double[] coeff = fpr.fitCurve(corrMeasure, qppEstimates);
@@ -102,7 +102,7 @@ public class QPPPolynomialRegressor {
                 System.out.println("CORR : " + corrMeasure.length);
                 corrMeasure = MinMaxNormalizer.normalize(corrMeasure);
                 
-                double[] qppEstimates = qppEvaluator.getQPPEstimates(qppEvaluator.topDocsMap, qppMethod, testQueries, corrMeasure, m);
+                double[] qppEstimates = qppEvaluator.getQPPEstimates(qppEvaluator.topDocsMap, qppMethod, testQueries, m);
                 System.out.println("ESTIMATE : " + qppEstimates.length);
                 double[] qppEstimateWithRegressor = new double[qppEstimates.length];
                 

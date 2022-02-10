@@ -8,6 +8,7 @@ package org.experiments;
 
 import java.util.*;
 
+import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.similarities.LMDirichletSimilarity;
 import org.apache.lucene.search.similarities.Similarity;
@@ -42,7 +43,6 @@ public class QPPLinearRegressor {
     static String               queryFile;
     static String               resFileTrain;
     static String               resFileTest;
-    RegressionLearner lr;
 
     static Random rnd = new Random(Settings.SEED);
     
@@ -55,7 +55,6 @@ public class QPPLinearRegressor {
         queryFile = prop.getProperty("query.file");
         resFileTrain = prop.getProperty("res.train");
         resFileTest = prop.getProperty("res.test");
-        lr = new RegressionLearner();
     }
     
     public void randomSplit(List<TRECQuery> queries) {
@@ -69,33 +68,35 @@ public class QPPLinearRegressor {
         }
     }
 
-    public void fit(QPPEvaluator qppEvaluator,
+    public RegParameters fit(QPPEvaluator qppEvaluator,
                     QPPMethod qppMethod, Metric m,
                     Similarity sim, int nwanted) throws Exception {
 
         double[] retEvalMeasure = qppEvaluator.evaluate(trainQueries, sim, m, nwanted);
-        double[] qppEstimates = qppEvaluator.getQPPEstimates(qppEvaluator.topDocsMap, qppMethod, trainQueries, retEvalMeasure, m);
+        double[] qppEstimates = qppEvaluator.getQPPEstimates(qppEvaluator.topDocsMap, qppMethod, trainQueries, m);
 
-        FitLinearRegressor fr = new FitLinearRegressor();
-        fr.fit(retEvalMeasure, qppEstimates);
-
-        lr.setSlope(fr.getSlope());
-        lr.setyIntercept(fr.getIntercept());
+        SimpleRegression reg = new SimpleRegression();
+        double[] n_pred = MinMaxNormalizer.normalize(qppEstimates); // in [0, 1]
+        for (int i=0; i<retEvalMeasure.length; i++) {
+            reg.addData(n_pred[i], retEvalMeasure[i]);
+        }
+        double min = Arrays.stream(qppEstimates).min().getAsDouble();
+        double max =Arrays.stream(qppEstimates).max().getAsDouble();
+        return new RegParameters(reg, min, max);
     }
     
-    public CorrelationPair predict(QPPEvaluator qppEvaluator, QPPMethod qppMethod, Metric m,
-                        Similarity sim, int nwanted) throws Exception {
+    public CorrelationPair predict(RegParameters regParameters,
+            QPPEvaluator qppEvaluator, QPPMethod qppMethod, Metric m,
+            Similarity sim, int nwanted) throws Exception {
 
         double[] perQueryRetEvalMeasure = qppEvaluator.evaluate(testQueries, sim, m, nwanted);
-        double[] qppEstimates = qppEvaluator.getQPPEstimates(qppEvaluator.topDocsMap, qppMethod, testQueries, perQueryRetEvalMeasure, m);
-        qppEstimates = MinMaxNormalizer.normalize(qppEstimates);
-
+        double[] qppEstimates = qppEvaluator.getQPPEstimates(qppEvaluator.topDocsMap, qppMethod, testQueries, m);
         float x = (float)qppEvaluator.measureCorrelation(perQueryRetEvalMeasure, qppEstimates);
 
         // Transform with LR
         double[] qppEstimatesTransformed = new double[qppEstimates.length];
         for (int i=0; i < qppEstimates.length; i++) {
-            double transformed = lr.getSlope() * qppEstimates[i] + lr.getyIntercept();
+            double transformed = regParameters.predict(qppEstimates[i]);
             System.out.println(String.format("%.4f --> %.4f", qppEstimates[i], transformed));
             qppEstimatesTransformed[i] = transformed;
         }
@@ -131,10 +132,11 @@ public class QPPLinearRegressor {
 
         // learn individual regressor learning parameters for individual qpp estimators
         System.out.println(String.format("Fitting linear regression on %s scores", Settings.getRetEvalMetric()));
-        qppreg.fit(qppEvaluator, method, Settings.getRetEvalMetric(), sim, nwanted);
+        RegParameters regParams = qppreg.fit(qppEvaluator, method, Settings.getRetEvalMetric(), sim, nwanted);
 
         // predict test set values based on individual learning parameters
-        CorrelationPair cp = qppreg.predict(qppEvaluator, method, Settings.getRetEvalMetric(), sim, nwanted);
+        CorrelationPair cp = qppreg.predict(regParams,
+                qppEvaluator, method, Settings.getRetEvalMetric(), sim, nwanted);
         System.out.println(String.format("CORRELATION (%s): %.4f %.4f",
                 Settings.getCorrelationMetric().name(), cp.withoutTransformation, cp.withTransformation));
     }
