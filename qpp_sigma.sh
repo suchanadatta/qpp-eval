@@ -22,7 +22,7 @@ RETEVAL_METRIC=$3
 METRIC=$4
 APPLY_REG=$5
 
-INDEXDIR=/Users/debasis/research/common/trecd45/index/
+INDEXDIR=/store/index/trec_robust_lucene8/
 QRELS=data/qrels.robust.all
 QUERYFILE=data/topics.robust.all
 
