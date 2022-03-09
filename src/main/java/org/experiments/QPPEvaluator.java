@@ -781,18 +781,15 @@ public class QPPEvaluator {
             List<TRECQuery> trainQueries = queries.subList(0, splitIndex);
             List<TRECQuery> testQueries = queries.subList(splitIndex, queries.size());
 
+            System.out.println(String.format(
+                    "#Train Queries : %d, #Test queries: %d", trainQueries.size(), testQueries.size()));
+            System.out.println("QPP method loaded : " + Settings.getQPPMethod().name() +
+                    "\tMeasure specificity on docs :" + Settings.getNumWanted());
+
             if (!toTransform) {
-                System.out.println(String.format(
-                        "#Train Queries : %d, #Test queries: %d", trainQueries.size(), testQueries.size()));
-                System.out.println("QPP method loaded : " + Settings.getQPPMethod().name() +
-                        "\tMeasure specificity on docs :" + Settings.getNumWanted());
                 qppEvaluator.evaluateQPPAtCutoff(Settings.getQPPMethod(), testQueries, Settings.getNumWanted());
             }
             else {
-                System.out.println(String.format(
-                        "#Train Queries : %d, #Test queries: %d", trainQueries.size(), testQueries.size()));
-                System.out.println("QPP method loaded : " + Settings.getQPPMethod().name() +
-                        "\tMeasure specificity on docs :" + Settings.getNumWanted());
                 qppEvaluator.evaluateQPPAtCutoff(Settings.getQPPMethod(), trainQueries, testQueries, Settings.getNumWanted());
             }
         }
