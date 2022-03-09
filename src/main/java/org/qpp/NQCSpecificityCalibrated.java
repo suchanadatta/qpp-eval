@@ -47,9 +47,10 @@ public class NQCSpecificityCalibrated extends BaseIDFSpecificity {
         double nqc = 0;
         for (double rsv: rsvs) {
             double factor_1 = avgIDF;
-            double factor_2 = (rsv - mean)/Math.sqrt(rsv) ;
+            // only works for a square function; beta is to be even; we force it to be even
+            double factor_2 = (rsv - mean)*(rsv - mean)/rsv;
 
-            double prod = Math.pow(factor_1, alpha) * Math.pow(factor_2, beta);
+            double prod = Math.pow(factor_1, alpha) * Math.pow(factor_2, beta); // this is actually 2*beta
             prod = Math.pow(prod, gamma);
 
             nqc += prod;
