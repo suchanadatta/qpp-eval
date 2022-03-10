@@ -19,8 +19,7 @@ import org.apache.lucene.search.TotalHits;
 
 public class UEFSpecificity implements QPPMethod {
     BaseIDFSpecificity qppMethod;
-    RelevanceModelIId rlm;
-    
+
     static Random rnd = new Random(Settings.SEED);
     static final int NUM_SAMPLES = 10;
 
