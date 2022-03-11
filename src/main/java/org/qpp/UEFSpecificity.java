@@ -3,6 +3,7 @@ package org.qpp;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
+import org.correlation.OverlapStats;
 import org.experiments.Settings;
 import org.feedback.RelevanceModelConditional;
 import org.feedback.RelevanceModelIId;
@@ -14,6 +15,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
 import org.apache.lucene.search.TotalHits;
 
 
@@ -27,41 +30,6 @@ public class UEFSpecificity implements QPPMethod {
         this.qppMethod = qppMethod;
     }
 
-    static private int[] getTopDocNames(TopDocs topDocs) {
-        int[] docIds = new int[topDocs.scoreDocs.length];
-        int i=0;
-        for (ScoreDoc sd: topDocs.scoreDocs) {
-            docIds[i++] = sd.doc;
-        }
-        return docIds;
-    }
-
-    // instead of using a rank correlation metric (where we need to supply two lists of float),
-    // we compute the average shift in the ranks of items.
-    // Assumption: |listA \cap listB| = |listA| = |listB|
-    static public double computeRankDist(TopDocs listA, TopDocs listB) {
-        int[] docIdsA = getTopDocNames(listA);
-        int[] docIdsB = getTopDocNames(listB);
-
-        Arrays.sort(docIdsB);
-        int posInA = 0, posInB;
-        double delRank;
-        double avgShift = 0;
-
-        for (int docId: docIdsA) {
-            posInB = Arrays.binarySearch(docIdsB, docId);
-            if (posInB >= 0) {
-                delRank = (posInA - posInB)/(double)docIdsA.length;
-                avgShift += delRank * delRank;
-            }
-            posInA++;
-        }
-
-        avgShift = avgShift/(double)docIdsA.length;
-        avgShift = Math.sqrt(avgShift);
-        return avgShift;
-    }
-    
     TopDocs sampleTopDocs(TopDocs topDocs, int M, int k) {
 //        ScoreDoc[] sampledScoreDocs = new ScoreDoc[k];
         ScoreDoc[] sampledScoreDocs = new ScoreDoc[Math.min(topDocs.scoreDocs.length, k)];
@@ -95,11 +63,11 @@ public class UEFSpecificity implements QPPMethod {
             }
 
             topDocs_rr = rlm.rerankDocs();
-            double rankDist = computeRankDist(topDocs, topDocs_rr);
+            double rankDist = OverlapStats.computeRankDist(topDocs, topDocs_rr);
             avgRankDist += rankDist;
         }
 
-        double rankSim = computeRankDist(topDocs, topDocs_rr);
+        double rankSim = OverlapStats.computeRankDist(topDocs, topDocs_rr);
         return ((double)NUM_SAMPLES/avgRankDist) * qppMethod.computeSpecificity(q, retInfo, topDocs, k);
     }
 
