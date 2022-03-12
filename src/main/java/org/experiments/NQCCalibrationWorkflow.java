@@ -37,7 +37,7 @@ public class NQCCalibrationWorkflow {
     Map<String, TopDocs> topDocsMap = new HashMap<>();
     QPPEvaluator qppEvaluator;
     Evaluator evaluator;
-    NQCSpecificityCalibrated qppMethod;
+    QPPMethod qppMethod;
     List<TRECQuery> queries;
 
     NQCCalibrationWorkflow(String queryFile) throws Exception {
