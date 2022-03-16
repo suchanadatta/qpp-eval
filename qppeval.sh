@@ -12,16 +12,16 @@ fi
 
 #These are hyper-parameters... usually these values work well
 NUMWANTED=100
-NUMTOP=50
+NUMTOP=100
 SPLITS=80
 
 MODEL=$1
 METHOD=$2
 RETEVAL_METRIC=$3
 METRIC=$4
-INDEXDIR=/Users/debasis/research/common/trecd45/index/
+INDEXDIR=/store/index/trec_robust_lucene8/
 QRELS=data/qrels.robust.all
-QUERYFILE=data/topics.robust.all
+QUERYFILE=data/topics.401-450.xml
 
 cat > qpp.properties << EOF1
 
@@ -46,6 +46,8 @@ EOF1
 #mvn exec:java@compute_all -Dexec.args="qpp.properties"
 #mvn exec:java@across_metrics -Dexec.args="qpp.properties"
 #mvn exec:java@across_models -Dexec.args="qpp.properties"
-mvn exec:java@linear_regressor -Dexec.args="qpp.properties"
+#mvn exec:java@linear_regressor -Dexec.args="qpp.properties"
 #mvn exec:java@poly_regressor -Dexec.args="qpp.properties"
+#mvn exec:java@nqc_calibrate -Dexec.args="qpp.properties"
+mvn exec:java@rls_predict -Dexec.args="qpp.properties"
 

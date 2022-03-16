@@ -50,16 +50,14 @@ public class NQCCalibrationWorkflow {
 
     public double computeCorrelation(List<TRECQuery> queries, QPPMethod qppMethod) {
         final int qppTopK = Settings.getQppTopK();
-
         int numQueries = queries.size();
-        double[] qppEstimates = new double[numQueries];
-        double[] evaluatedMetricValues = new double[numQueries];
+        double[] qppEstimates = new double[numQueries]; // stores qpp estimates for the list of input queries
+        double[] evaluatedMetricValues = new double[numQueries]; // stores GTs (AP/nDCG etc.) for the list of input queries
 
         int i = 0;
         for (TRECQuery query : queries) {
             RetrievedResults rr = evaluator.getRetrievedResultsForQueryId(query.id);
             TopDocs topDocs = topDocsMap.get(query.id);
-
             evaluatedMetricValues[i] = evaluator.compute(query.id, Metric.AP);
             qppEstimates[i] = (float)qppMethod.computeSpecificity(
                     query.getLuceneQueryObj(), rr, topDocs, qppTopK);
@@ -73,9 +71,9 @@ public class NQCCalibrationWorkflow {
 
     public float[] calibrateParams(List<TRECQuery> trainQueries) {
         final int qppTopK = Settings.getQppTopK();
-        final float[] alpha_choices = {0.25f, /*0.5f, 1.0f, 1.5f, 2.0f*/};
+        final float[] alpha_choices = {/*0.25f, 0.5f, 1.0f,*/ 1.5f, /*2.0f*/};
         final float[] beta_choices = {0.25f, /*0.5f, 1.0f, 1.5f, 2.0f*/};
-        final float[] gamma_choices = {0.25f, /*0.5f /*, 1.0f, 1.5f, 2.0f*/};
+        final float[] gamma_choices = {/*0.25f,*/ 0.5f /*, 1.0f, 1.5f, 2.0f*/};
         float[] best_choice = new float[3]; // best (alpha, beta, gamma)
         double max_corr = 0;
 
