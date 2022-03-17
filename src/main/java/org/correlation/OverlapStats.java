@@ -28,6 +28,12 @@ public class OverlapStats {
         return (1-p) * aggr_overlaps;
     }
 
+    static public double computeRBO(TopDocs listA, TopDocs listB) {
+        int[] docIdsA = getTopDocNames(listA);
+        int[] docIdsB = getTopDocNames(listB);
+        return computeRBO(docIdsA, docIdsB, listA.scoreDocs.length, 0.9f);
+    }
+
     static public double computeRBO(TopDocs listA, TopDocs listB, int k, float p) {
         int[] docIdsA = getTopDocNames(listA);
         int[] docIdsB = getTopDocNames(listB);

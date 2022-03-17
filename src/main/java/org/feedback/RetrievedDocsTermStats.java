@@ -41,9 +41,15 @@ public class RetrievedDocsTermStats {
         docTermVecs = new ArrayList<>();
         this.numTopDocs = numTopDocs;
     }
-    
+
+    public PerDocTermVector getDocTermVecs(int i) {
+        return docTermVecs.get(i);
+    }
+
     public IndexReader getReader() { return reader; }
-    
+
+    public float getSumDf() { return sumDf; }
+
     public Map<String, RetrievedDocTermInfo> getTermStats() {
         return termStats;
     }
