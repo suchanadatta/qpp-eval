@@ -28,7 +28,7 @@ public class PRFSpeciticity {
         float ce = 0;
         int i = 0;
         for (ScoreDoc sd: topDocs.scoreDocs) {
-            ce += crossEntropy(topDocs, rlm);
+            ce += crossEntropy(topDocs, rlm, i);
             i++;
         }
         return ce/(float)topDocs.scoreDocs.length;
