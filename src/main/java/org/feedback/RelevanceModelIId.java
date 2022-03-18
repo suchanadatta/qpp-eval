@@ -147,4 +147,76 @@ public class RelevanceModelIId {
         return rerankedDocs;
     }
 
+    // Implement post-RLM query expansion. Set the term weights
+    // according to the values of f(w).
+    public TRECQuery expandQuery(int numExpansionTerms) throws Exception {
+        final String FIELD_NAME = "words";
+
+        // The calling sequence has to make sure that the top docs are already
+        // reranked by KL-div
+        // Now reestimate relevance model on the reranked docs this time
+        // for QE.
+        computeFdbkWeights();
+
+        TRECQuery expandedQuery = new TRECQuery(this.trecQuery);
+        Set<Term> origTerms = new HashSet<>();
+        this.trecQuery.luceneQuery
+                .createWeight(searcher, ScoreMode.COMPLETE, 1)
+                .extractTerms(origTerms);
+        HashMap<String, String> origQueryWordStrings = new HashMap<>();
+
+        float normalizationFactor = 0;
+
+        List<RetrievedDocTermInfo> termStats = new ArrayList<>();
+        for (Map.Entry<String, RetrievedDocTermInfo> e : retrievedDocsTermStats.termStats.entrySet()) {
+            RetrievedDocTermInfo w = e.getValue();
+            w.setWeight(w.getWeight() *
+                    (float)Math.log(
+                        reader.numDocs()/(float)reader.docFreq(new Term(FIELD_NAME, w.getTerm()))
+                    )
+            );
+            termStats.add(w);
+            normalizationFactor += w.getWeight();
+        }
+
+        // Normalize the weights
+        for (Map.Entry<String, RetrievedDocTermInfo> e : retrievedDocsTermStats.termStats.entrySet()) {
+            RetrievedDocTermInfo w = e.getValue();
+            w.setWeight(w.getWeight()/normalizationFactor);
+        }
+
+        Collections.sort(termStats);
+
+        BooleanQuery.Builder expandedQueryBuilder = new BooleanQuery.Builder();
+        for (Term t : origTerms) {
+            origQueryWordStrings.put(t.text(), t.text());
+            //+++POST_SIGIR review: Assigned weights according to RLM post QE
+            //tq.setBoost(1-fbweight);
+            BoostQuery tq = new BoostQuery(
+                    new TermQuery(t),
+                    (1-fbweight)/(float)origTerms.size());
+            //---POST_SIGIR review
+            expandedQueryBuilder.add(tq, BooleanClause.Occur.SHOULD);
+        }
+
+        int nTermsAdded = 0;
+        for (RetrievedDocTermInfo selTerm : termStats) {
+            String thisTerm = selTerm.getTerm();
+            if (origQueryWordStrings.get(thisTerm) != null)
+                continue;
+
+            BoostQuery tq = new BoostQuery(
+                    new TermQuery(new Term(FIELD_NAME, thisTerm)),
+                    fbweight*selTerm.getWeight()
+            );
+            expandedQueryBuilder.add(tq, BooleanClause.Occur.SHOULD);
+
+            nTermsAdded++;
+            if (nTermsAdded >= numExpansionTerms)
+                break;
+        }
+
+        expandedQuery.luceneQuery = expandedQueryBuilder.build();
+        return expandedQuery;
+    }
 }
