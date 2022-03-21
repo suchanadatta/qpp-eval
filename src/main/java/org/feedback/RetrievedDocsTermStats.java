@@ -24,9 +24,8 @@ import java.util.Map;
 public class RetrievedDocsTermStats {
     TopDocs topDocs;
     IndexReader reader;
-    int sumTf;
+    private int sumTf;
     float sumDf;
-    float sumSim;
     Map<String, RetrievedDocTermInfo> termStats;
     List<PerDocTermVector> docTermVecs;
     int numTopDocs;
@@ -35,7 +34,6 @@ public class RetrievedDocsTermStats {
             TopDocs topDocs, int numTopDocs) {
         this.topDocs = topDocs;
         this.reader = reader;
-        sumTf = 0;
         sumDf = numTopDocs;
         termStats = new HashMap<>();
         docTermVecs = new ArrayList<>();
@@ -44,6 +42,12 @@ public class RetrievedDocsTermStats {
 
     public PerDocTermVector getDocTermVecs(int i) {
         return docTermVecs.get(i);
+    }
+
+    public int sumTf() {
+        if (sumTf==0)
+            sumTf = termStats.values().stream().map(x->x.getTf()).reduce(0, (a,b)->a+b);
+        return sumTf;
     }
 
     public IndexReader getReader() { return reader; }
@@ -90,8 +94,6 @@ public class RetrievedDocsTermStats {
             
             // per-doc
             docTermVector.perDocStats.put(termText, new RetrievedDocTermInfo(termText, tf));
-            docTermVector.sum_tf += tf;
-            
             if (rank >= numTopDocs) {
                 continue;
             }
@@ -100,13 +102,12 @@ public class RetrievedDocsTermStats {
             trmInfo = termStats.get(termText);
             if (trmInfo == null) {
                 trmInfo = new RetrievedDocTermInfo(termText);
-                termStats.put(termText, trmInfo);
             }
-            trmInfo.setWeight(trmInfo.getTf() + tf);
+            trmInfo.incrementTf(tf);
             trmInfo.incrementDF();
-            sumTf += tf;
-            sumSim += sim;
+            termStats.put(termText, trmInfo);
         }
+    	docTermVector.setSumTf();
         return docTermVector;
     }
 }

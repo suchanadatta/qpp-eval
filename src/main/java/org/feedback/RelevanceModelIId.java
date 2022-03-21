@@ -26,8 +26,8 @@ class KLDivScoreComparator implements Comparator<ScoreDoc> {
 }
 
 public class RelevanceModelIId {
-    TRECQuery trecQuery;
     TopDocs topDocs;
+    TRECQuery trecQuery;
     float mixingLambda;
     int numTopDocs;
     RetrievedDocsTermStats retrievedDocsTermStats;
@@ -47,6 +47,8 @@ public class RelevanceModelIId {
 
         this.topDocs = topDocs;
         this.numTopDocs = numTopDocs;
+        fbweight = FBWEIGHT;
+        mixingLambda = MIXING_LAMBDA;
     }
     
     public RetrievedDocsTermStats getRetrievedDocsTermStats() {
@@ -61,7 +63,7 @@ public class RelevanceModelIId {
     }
     
     float mixTfIdf(RetrievedDocTermInfo w) {
-        return MIXING_LAMBDA *w.getTf()/(float)retrievedDocsTermStats.sumTf +
+        return MIXING_LAMBDA *w.getTf()/(float)retrievedDocsTermStats.sumTf() +
                 (1- MIXING_LAMBDA)*w.getDf()/retrievedDocsTermStats.sumDf;
     }
 
@@ -93,7 +95,7 @@ public class RelevanceModelIId {
                     System.err.println("No KDE for query term: " + qTerm.toString());
                     continue;
                 }
-                p_q = qtermInfo.getTf()/(float)retrievedDocsTermStats.sumTf;
+                p_q = qtermInfo.getTf()/(float)retrievedDocsTermStats.sumTf();
                 
                 total_p_q += Math.log(1+p_q);
             }
@@ -149,7 +151,7 @@ public class RelevanceModelIId {
 
     // Implement post-RLM query expansion. Set the term weights
     // according to the values of f(w).
-    public TRECQuery expandQuery(int numExpansionTerms) throws Exception {
+    public TRECQuery expandQuery(TRECQuery trecQuery, int numExpansionTerms) throws Exception {
         final String FIELD_NAME = "words";
 
         // The calling sequence has to make sure that the top docs are already
@@ -158,9 +160,9 @@ public class RelevanceModelIId {
         // for QE.
         computeFdbkWeights();
 
-        TRECQuery expandedQuery = new TRECQuery(this.trecQuery);
+        TRECQuery expandedQuery = new TRECQuery(trecQuery);
         Set<Term> origTerms = new HashSet<>();
-        this.trecQuery.luceneQuery
+        trecQuery.luceneQuery
                 .createWeight(searcher, ScoreMode.COMPLETE, 1)
                 .extractTerms(origTerms);
         HashMap<String, String> origQueryWordStrings = new HashMap<>();
@@ -180,8 +182,7 @@ public class RelevanceModelIId {
         }
 
         // Normalize the weights
-        for (Map.Entry<String, RetrievedDocTermInfo> e : retrievedDocsTermStats.termStats.entrySet()) {
-            RetrievedDocTermInfo w = e.getValue();
+        for (RetrievedDocTermInfo w: retrievedDocsTermStats.termStats.values()) {
             w.setWeight(w.getWeight()/normalizationFactor);
         }
 

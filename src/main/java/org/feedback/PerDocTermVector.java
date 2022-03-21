@@ -13,21 +13,24 @@ import java.util.HashMap;
  */
 public class PerDocTermVector {
     int docId;
-    int sum_tf;
     float sim;  // similarity with query
     HashMap<String, RetrievedDocTermInfo> perDocStats;
+    float sum_tf;
     
     public PerDocTermVector(int docId) {
         this.docId = docId;
         perDocStats = new HashMap<>();
-        sum_tf = 0;
     }
     
     public float getNormalizedTf(String term) {
         RetrievedDocTermInfo tInfo = perDocStats.get(term);
         if (tInfo == null)
             return 0;
-        return perDocStats.get(term).getTf()/(float)sum_tf;
+        return perDocStats.get(term).getTf()/sum_tf;
+    }
+
+    public void setSumTf() {
+        sum_tf = (float)(perDocStats.values().stream().map(x->x.getTf()).reduce(0, (a,b)->a+b));
     }
 
     public int getTf(String term) {

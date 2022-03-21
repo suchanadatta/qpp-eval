@@ -31,7 +31,7 @@ public class PRFSpecificityWorkflow extends NQCCalibrationWorkflow {
         qppMethod = new PRFSpeciticity(Settings.getSearcher(), ALPHA);
     }
 
-    TRECQuery expandQuery(Query q, TopDocs topDocs, int k) throws Exception {
+    TRECQuery expandQuery(TRECQuery q, TopDocs topDocs, int k) throws Exception {
         ScoreDoc[] sd = new ScoreDoc[k];
         System.arraycopy(topDocs.scoreDocs, 0, sd, 0, k);
         TopDocs subset = new TopDocs(topDocs.totalHits, sd);
@@ -39,15 +39,14 @@ public class PRFSpecificityWorkflow extends NQCCalibrationWorkflow {
         RelevanceModelIId rlm = null;
         try {
             rlm = new RelevanceModelConditional(
-                    Settings.getSearcher(), new TRECQuery(q), subset, subset.scoreDocs.length);
-            rlm.computeFdbkWeights();
+                    Settings.getSearcher(), q, subset, subset.scoreDocs.length);
         }
         catch (IOException ioex) { ioex.printStackTrace(); } catch (Exception ex) {
             Logger.getLogger(UEFSpecificity.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         // Post retrieval query expansion
-        TRECQuery expandedQuery = rlm.expandQuery(NUM_EXPANSION_TERMS);
+        TRECQuery expandedQuery = rlm.expandQuery(q, NUM_EXPANSION_TERMS);
         System.out.println("Expanded qry: " + expandedQuery.getLuceneQueryObj());
 
         return expandedQuery;
@@ -64,7 +63,7 @@ public class PRFSpecificityWorkflow extends NQCCalibrationWorkflow {
 
         for (TRECQuery query : queries) {
             TopDocs topDocs = topDocsMap.get(query.id);
-            TRECQuery expandQuery = expandQuery(query.luceneQuery, topDocs, qppTopK);
+            TRECQuery expandQuery = expandQuery(query, topDocs, qppTopK);
             System.out.println("Query: " + query + ", Expanded query: " + expandQuery);
             expandedQueries.add(expandQuery);
         }
