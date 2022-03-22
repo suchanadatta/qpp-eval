@@ -83,17 +83,23 @@ public class RLSSpecificity implements QPPMethod {
     Set<RetrievedDocTermInfo> topFdbkTerms(TRECQuery q, TopDocs topDocs) throws Exception {
         RelevanceModelIId rlm = new RelevanceModelConditional(searcher, q, topDocs, NUM_FDBK_TOP_DOCS);
         rlm.computeFdbkWeights();
-        RetrievedDocsTermStats stats = rlm.getRetrievedDocsTermStats();
-        List<RetrievedDocTermInfo> termWts =
-                stats.getTermStats()
-                .values().stream()
-                .sorted(RetrievedDocTermInfo::compareTo)
-                .collect(Collectors.toList());
-        return new HashSet<>(termWts.subList(0, NUM_SAMPLES)); // select NUM_SAMPLES terms to make NUM_SAMPLES augmented queries
+        Set<String> qTerms = q.getQueryTerms(searcher).stream().map(x->x.text()).collect(Collectors.toSet());
+
+        return
+            rlm
+            .getRetrievedDocsTermStats()
+            .getTermStats()
+            .values().stream()
+            .sorted(RetrievedDocTermInfo::compareTo)
+            .filter(x -> !qTerms.contains(x.getTerm()))
+            .limit(NUM_SAMPLES)
+            .collect(Collectors.toSet());
     }
 
     List<Query> generateAugmentedQueries(TRECQuery q, TopDocs topDocs) throws Exception {
         Set<RetrievedDocTermInfo> topTermWts = topFdbkTerms(q, topDocs); // NUM_SAMPLES feedback terms
+        //topTermWts.stream().forEach(System.out::println);
+
         List<Query> augmented_queries = new ArrayList<>();
         /* for each feedback term */
         for (RetrievedDocTermInfo termInfo: topTermWts) {
@@ -107,10 +113,11 @@ public class RLSSpecificity implements QPPMethod {
     /* create a list of reference queries */
     List<QueryAndTopDocs> getReferenceLists(Query q, TopDocs topDocs, int numWanted) throws Exception {
         List<Query> augmented_queries = generateAugmentedQueries(new TRECQuery(q), topDocs);
+        //augmented_queries.stream().forEach(System.out::println);
+
         /* list of augmented <query + topdocs> objects */
         List<QueryAndTopDocs> refLists = new ArrayList<>();
         for (Query q_augmented: augmented_queries) {
-//            System.out.println("Augmented Query : " + q_augmented.toString());
             QueryAndTopDocs queryAndTopDocs = new QueryAndTopDocs(q_augmented, searcher.search(q_augmented, numWanted));
             refLists.add(queryAndTopDocs);
         }
@@ -144,33 +151,32 @@ public class RLSSpecificity implements QPPMethod {
                                             List<QueryAndTopDocs> refLists) throws IOException {
         List<QueryAndTopDocs> queryAndTopDocsList = new ArrayList<>(refLists.size());
         System.out.println(String.format("Query %s: #ref lists = %d", orig_q.toString(), refLists.size()));
+
         int numPos = 0;
         double [] original_query_rsv, augmented_query_rsv;
 //        double maxidf_o = new BaseIDFSpecificity(searcher).maxIDF(orig_q);
+
         original_query_rsv = Arrays.stream(retList.scoreDocs)
                 .map(scoreDoc -> scoreDoc.score)
                 .mapToDouble(d -> d)
                 .toArray();        
-//        double[] original_query_rsv_idf = new double[original_query_rsv.length];
-//            for(int i = 0; i < original_query_rsv.length; i++) {
-//                original_query_rsv_idf[i] = original_query_rsv[i] * maxidf_o;
-//            } 
+
+        //List<Double> p_values = new ArrayList<>();
 
         for (QueryAndTopDocs queryAndTopDocs: refLists) {
             Query aug_query = queryAndTopDocs.q;
-            double maxidf_aug = new BaseIDFSpecificity(searcher).maxIDF(aug_query); 
+            //double maxidf_aug = new BaseIDFSpecificity(searcher).maxIDF(aug_query);
             augmented_query_rsv = Arrays.stream(queryAndTopDocs.topDocs.scoreDocs)
-                    .map(scoreDoc -> scoreDoc.score)
+                    //.map(scoreDoc -> scoreDoc.score * maxidf_aug)
+                    .map(scoreDoc -> scoreDoc.score) // "to be or not to be" idf
                     .mapToDouble(d -> d)
                     .toArray();            
-            double[] augmented_query_rsv_idf = new double[augmented_query_rsv.length];
-            for(int i = 0; i < augmented_query_rsv.length; i++) {
-                augmented_query_rsv_idf[i] = augmented_query_rsv[i] * maxidf_aug;
-            }            
 
-            boolean rejected = new TTest().pairedTTest(original_query_rsv, augmented_query_rsv_idf, ALPHA);
+            boolean rejected = new TTest().tTest(original_query_rsv, augmented_query_rsv, ALPHA);
             //DEBUG: If you wanna check the p values
-            double p = new TTest().pairedTTest(original_query_rsv, augmented_query_rsv_idf);
+            //double p = new TTest().pairedTTest(original_query_rsv, augmented_query_rsv);
+            //p_values.add(p);
+
 //            System.out.println("p = " + p);
             if (rejected) { // scores come from different means; hence they are different significantly
                 double specificity_estimate = compareSpecificities(orig_q, retList, aug_query, queryAndTopDocs.topDocs);
@@ -178,11 +184,15 @@ public class RLSSpecificity implements QPPMethod {
                 queryAndTopDocs.setPolarity(specificity_estimate >= 0);
                 queryAndTopDocs.setSpecificity(specificity_estimate);
                 queryAndTopDocsList.add(queryAndTopDocs);
-                numPos = numPos + (specificity_estimate >= 0? 1: 0);
-//                System.out.println("NUM POS : " + numPos);
+                if (specificity_estimate >= 0)
+                    numPos++;
+            }
+            else {
+                System.out.println("Discarding ranked list for query " + aug_query);
             }
         }
         System.out.println(String.format("#pos = %d, #neg = %d", numPos, queryAndTopDocsList.size() - numPos));
+        //System.out.println(String.format("Max p: %.6f", p_values.stream().mapToDouble(x->x).max().getAsDouble()));
         return queryAndTopDocsList;
     }
 
