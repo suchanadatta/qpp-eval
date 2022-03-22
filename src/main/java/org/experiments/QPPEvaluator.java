@@ -146,6 +146,28 @@ public class QPPEvaluator {
         return aggregated_idf/(double)qterms.size();
     }
 
+    public Evaluator executeDummy(List<TRECQuery> queries, Similarity sim,
+                                    int cutoff, String qrelsFile, String resFile,
+                                    Map<String, TopDocs> topDocsMap) throws Exception {
+
+        int numQueries = queries.size();
+        double[] evaluatedMetricValues = new double[numQueries];
+
+        FileWriter fw = new FileWriter(resFile);
+        BufferedWriter bw = new BufferedWriter(fw);
+
+        for (TRECQuery query : queries) {
+            TopDocs topDocs = topDocsMap.get(query.id);
+            saveRetrievedTuples(bw, query, topDocs, sim.toString());
+        }
+        bw.flush();
+        bw.close();
+        fw.close();
+
+        Evaluator evaluator = new Evaluator(qrelsFile, resFile); // load ret and rel
+        return evaluator;
+    }
+
     public Evaluator executeQueries(List<TRECQuery> queries, Similarity sim,
                                     int cutoff, String qrelsFile, String resFile, 
                                     Map<String, TopDocs> topDocsMap) throws Exception {

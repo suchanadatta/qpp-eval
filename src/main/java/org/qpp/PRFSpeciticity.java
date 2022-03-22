@@ -1,5 +1,6 @@
 package org.qpp;
 
+import org.apache.lucene.index.Term;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
@@ -7,8 +8,10 @@ import org.apache.lucene.search.TopDocs;
 import org.correlation.OverlapStats;
 import org.evaluator.RetrievedResults;
 import org.feedback.*;
+import org.trec.FieldConstants;
 import org.trec.TRECQuery;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -24,24 +27,29 @@ public class PRFSpeciticity {
         this.alpha = alpha;
     }
 
-    private float crossEntropy(TopDocs topDocs, RelevanceModelIId rlm) {
+    private float crossEntropy(TopDocs topDocs, RelevanceModelIId rlm, int qppTopK) {
         float ce = 0;
-        int i = 0;
-        for (ScoreDoc sd: topDocs.scoreDocs) {
-            ce += crossEntropy(topDocs, rlm, i);
-            i++;
+
+        try {
+            for (int i=0; i < qppTopK; i++) {
+                ce += crossEntropyForOneDoc(topDocs, rlm, i);
+            }
         }
-        return ce/(float)topDocs.scoreDocs.length;
+        catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        float avg_ce = ce/(float)topDocs.scoreDocs.length;
+        return avg_ce;
     }
 
-    private float entropy_of_mean_doc_lm(TopDocs topDocs, RelevanceModelIId rlm) {
+    private float entropy_of_mean_doc_lm(TopDocs topDocs, RelevanceModelIId rlm, int qppTopK) {
         RetrievedDocsTermStats retrievedDocsTermStats = rlm.getRetrievedDocsTermStats();
         PerDocTermVector mu = new PerDocTermVector(0); // docid is unused here
 
         for (RetrievedDocTermInfo retDocInfo : retrievedDocsTermStats.getTermStats().values()) { // for vocab of top
             String w = retDocInfo.getTerm();
 
-            for (int i=0; i < topDocs.scoreDocs.length; i++) {
+            for (int i=0; i < qppTopK; i++) {
                 PerDocTermVector docVector = retrievedDocsTermStats.getDocTermVecs(i);
                 int tf = docVector.getTf(w);  /// tf(w)
                 mu.addTermWt(w, tf);
@@ -55,32 +63,38 @@ public class PRFSpeciticity {
         float entropy = 0;
         for (RetrievedDocTermInfo tinfo: termStats.values()) {
             float p_x_i = tinfo.getTf()/(float)sum_tf;
-            float log_p_x_i = (float)Math.log(1 + p_x_i);
-            entropy += log_p_x_i;
+            float log_p_x_i = (float)Math.log(p_x_i);
+            entropy += p_x_i*log_p_x_i;
         }
 
         // compute entropy
-        return entropy/(float)termStats.values().size();
+        return -1*entropy;
     }
 
-    private float crossEntropy(TopDocs topDocs, RelevanceModelIId rlm, int i) {
+    // how close is the document LM to the TopDocs LM and how distict is the topDocs LM from the collection
+    private float crossEntropyForOneDoc(TopDocs topDocs, RelevanceModelIId rlm, int i) throws IOException {
         float klDiv = 0;
         float p_w_D;    // P(w|D) for this doc D
-        final float EPSILON = 0.0001f;
+        float p_w_R;    // P(w|D) for top-docs
+        String term;
+        double N = (double)searcher.getIndexReader().numDocs();
 
-        RetrievedDocsTermStats retrievedDocsTermStats = rlm.getRetrievedDocsTermStats();
-        PerDocTermVector docVector = retrievedDocsTermStats.getDocTermVecs(i);
+        RetrievedDocsTermStats retrievedDocsTermStats = rlm.getRetrievedDocsTermStats(); // topdocs stats
+        float Z = retrievedDocsTermStats.sumTf();
+        PerDocTermVector docVector = retrievedDocsTermStats.getDocTermVecs(i); // per-doc stats
 
         // For each v \in V (vocab of top ranked documents)
-        for (Map.Entry<String, RetrievedDocTermInfo> e : retrievedDocsTermStats.getTermStats().entrySet()) {
-            RetrievedDocTermInfo w = e.getValue();
-
-            float ntf = docVector.getNormalizedTf(w.getTerm());
-            if (ntf == 0)
-                ntf = EPSILON; // avoid 0 error
-            p_w_D = ntf;
-            float p_w_C = w.getDf()/retrievedDocsTermStats.getSumDf();
-            klDiv += w.getWeight() * (Math.log(w.getWeight()/p_w_D) - Math.log(w.getWeight()/p_w_C));
+        for (RetrievedDocTermInfo w: docVector.getTermStats().values()) {
+            term = w.getTerm();
+            p_w_D = docVector.getNormalizedTf(term);
+            RetrievedDocTermInfo w_g = retrievedDocsTermStats.getTermStats(term);
+            if (w_g==null) {
+                w_g = w_g;
+                continue;
+            }
+            else p_w_R = w_g.getTf()/Z;
+            float p_w_C = (float)(searcher.getIndexReader().docFreq(new Term(FieldConstants.FIELD_ANALYZED_CONTENT, term))/N);
+            klDiv += p_w_R * (Math.log(p_w_R/p_w_D) - Math.log(p_w_D/p_w_C));
         }
         return klDiv;
     }
@@ -98,16 +112,18 @@ public class PRFSpeciticity {
             rlm.computeFdbkWeights();
 
             float sim_D_second_Dinit = (float)OverlapStats.computeRBO(firstStepTopDocs, topDocs);
-            float p_d_r_Dinit = crossEntropy(firstStepTopDocs, rlm);
-            float r_Dinit = entropy_of_mean_doc_lm(firstStepTopDocs, rlm);
+            float p_d_r_Dinit = crossEntropy(firstStepTopDocs, rlm, k);
+            float r_Dinit = entropy_of_mean_doc_lm(firstStepTopDocs, rlm, k);
 
             float p_Dsecond_Dinit = 0;
-            for (int i=0; i < topDocs.scoreDocs.length; i++) {
-                p_Dsecond_Dinit += p_d_r_Dinit/r_Dinit;
-
+            for (int i=0; i < k; i++) {
+                ScoreDoc sd = topDocs.scoreDocs[i];
+                p_Dsecond_Dinit += sd.score * p_d_r_Dinit/r_Dinit;
             }
 
-            return alpha*prob_D_second + (1-alpha)*sim_D_second_Dinit*p_Dsecond_Dinit;
+            return alpha * prob_D_second + (1-alpha) * sim_D_second_Dinit/p_Dsecond_Dinit;
+            //return alpha * prob_D_second + (1-alpha) * sim_D_second_Dinit;
+            //return (1-alpha)*prob_D_second*sim_D_second_Dinit;
         }
         catch (Exception ex) {
             ex.printStackTrace();

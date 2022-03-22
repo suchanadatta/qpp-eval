@@ -67,7 +67,7 @@ public class RetrievedDocsTermStats {
         }
     }
     
-    RetrievedDocTermInfo getTermStats(String qTerm) {
+    public RetrievedDocTermInfo getTermStats(String qTerm) {
         return this.termStats.get(qTerm);        
     }
     

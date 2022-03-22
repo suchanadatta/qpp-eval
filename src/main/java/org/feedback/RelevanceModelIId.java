@@ -8,6 +8,7 @@ package org.feedback;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.*;
+import org.trec.FieldConstants;
 import org.trec.TRECQuery;
 import java.util.*;
 import java.io.IOException;
@@ -152,7 +153,7 @@ public class RelevanceModelIId {
     // Implement post-RLM query expansion. Set the term weights
     // according to the values of f(w).
     public TRECQuery expandQuery(TRECQuery trecQuery, int numExpansionTerms) throws Exception {
-        final String FIELD_NAME = "words";
+        final String FIELD_NAME = FieldConstants.FIELD_ANALYZED_CONTENT;
 
         // The calling sequence has to make sure that the top docs are already
         // reranked by KL-div
