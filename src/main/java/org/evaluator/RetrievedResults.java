@@ -20,6 +20,12 @@ public class RetrievedResults implements Comparable<RetrievedResults> {
         numRelRet = -1;
     }
 
+    public String getQid() { return qid; }
+
+    public int getNumRet() { return rtuples.size(); }
+
+    public List<ResultTuple> getTuples() { return this.rtuples; }
+
     public double[] getRSVs(int k) {
         return ArrayUtils
                 .toPrimitive(rtuples
@@ -30,7 +36,7 @@ public class RetrievedResults implements Comparable<RetrievedResults> {
                 .toArray(new Double[0]), 0.0);
     }
 
-    void addTuple(String docName, int rank, double score) {
+    public void addTuple(String docName, int rank, double score) {
         rtuples.add(new ResultTuple(docName, rank, score));
     }
 

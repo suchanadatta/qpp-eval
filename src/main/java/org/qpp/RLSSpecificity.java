@@ -156,9 +156,11 @@ public class RLSSpecificity implements QPPMethod {
         double [] original_query_rsv, augmented_query_rsv;
 //        double maxidf_o = new BaseIDFSpecificity(searcher).maxIDF(orig_q);
 
+        double max_orig_rsv = Arrays.stream(retList.scoreDocs).map(x->x.score).mapToDouble(x->x).max().getAsDouble();
         original_query_rsv = Arrays.stream(retList.scoreDocs)
                 .map(scoreDoc -> scoreDoc.score)
                 .mapToDouble(d -> d)
+                .map(d->d/max_orig_rsv)
                 .toArray();        
 
         //List<Double> p_values = new ArrayList<>();
@@ -166,11 +168,13 @@ public class RLSSpecificity implements QPPMethod {
         for (QueryAndTopDocs queryAndTopDocs: refLists) {
             Query aug_query = queryAndTopDocs.q;
             //double maxidf_aug = new BaseIDFSpecificity(searcher).maxIDF(aug_query);
+            double max_aug_rsv = Arrays.stream(retList.scoreDocs).map(x->x.score).mapToDouble(x->x).max().getAsDouble();
             augmented_query_rsv = Arrays.stream(queryAndTopDocs.topDocs.scoreDocs)
                     //.map(scoreDoc -> scoreDoc.score * maxidf_aug)
                     .map(scoreDoc -> scoreDoc.score) // "to be or not to be" idf
                     .mapToDouble(d -> d)
-                    .toArray();            
+                    .map(d->d/max_aug_rsv)
+                    .toArray();
 
             boolean rejected = new TTest().tTest(original_query_rsv, augmented_query_rsv, ALPHA);
             //DEBUG: If you wanna check the p values

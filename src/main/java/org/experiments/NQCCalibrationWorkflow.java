@@ -1,17 +1,24 @@
 package org.experiments;
 
-import org.apache.lucene.search.TopDocs;
+import org.apache.commons.io.FileUtils;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.*;
 import org.apache.lucene.search.similarities.LMDirichletSimilarity;
 import org.apache.lucene.search.similarities.Similarity;
 import org.correlation.KendalCorrelation;
 import org.evaluator.Evaluator;
 import org.evaluator.Metric;
+import org.evaluator.ResultTuple;
 import org.evaluator.RetrievedResults;
 import org.qpp.NQCSpecificityCalibrated;
 import org.qpp.QPPMethod;
+import org.trec.FieldConstants;
 import org.trec.TRECQuery;
 
+import java.io.File;
 import java.util.*;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 class TrainTestInfo {
     List<TRECQuery> train;
@@ -48,15 +55,84 @@ public class NQCCalibrationWorkflow {
         evaluator = qppEvaluator.executeQueries(queries, sim, Settings.getNumWanted(), Settings.getQrelsFile(), Settings.RES_FILE, topDocsMap);
     }
 
+    NQCCalibrationWorkflow(String queryFile, String resFile) throws Exception {
+        qppEvaluator = new QPPEvaluator(
+                Settings.getProp(),
+                Settings.getCorrelationMetric(), Settings.getSearcher(), Settings.getNumWanted());
+        queries = qppEvaluator.constructQueries(queryFile);
+        topDocsMap = loadResFile(new File(resFile));
+        evaluator = qppEvaluator.executeDummy(queries, sim,
+                Settings.getNumWanted(), Settings.getQrelsFile(),
+                Settings.RES_FILE, topDocsMap);
+    }
+
+    public Map<String, TopDocs> loadResFile(File resFile) {
+        Map<String, TopDocs> topDocsMap = new HashMap<>();
+        try {
+            List<String> lines = FileUtils.readLines(resFile, UTF_8);
+
+            String prev_qid = null, qid = null;
+            RetrievedResults rr = null;
+
+            for (String line: lines) {
+                String[] tokens = line.split("\\s+");
+                qid = tokens[0];
+
+                if (prev_qid!=null && !prev_qid.equals(qid)) {
+                    topDocsMap.put(prev_qid, convert(rr));
+                    rr = new RetrievedResults(qid);
+                }
+                else if (prev_qid == null) {
+                    rr = new RetrievedResults(qid);
+                }
+
+                int offset = getDocOffsetFromId(tokens[2]);
+                int rank = Integer.parseInt(tokens[3]);
+                double score = Float.parseFloat(tokens[4]);
+
+                rr.addTuple(String.valueOf(offset), rank, score);
+                prev_qid = qid;
+            }
+            if (qid!=null)
+                topDocsMap.put(qid, convert(rr));
+        }
+        catch (Exception ex) {
+            ex.printStackTrace();
+        }
+
+        return topDocsMap;
+    }
+
+    private int getDocOffsetFromId(String docId) throws Exception {
+        Query query = new TermQuery(new Term(FieldConstants.FIELD_ID, docId));
+        TopDocs topDocs = qppEvaluator.searcher.search(query, 1);
+        return topDocs.scoreDocs[0].doc;
+    }
+
+    private TopDocs convert(RetrievedResults rr) {
+        int nret = rr.getNumRet();
+        ScoreDoc[] sd = new ScoreDoc[nret];
+
+        int i = 0;
+        for (ResultTuple resultTuple: rr.getTuples()) {
+            sd[i++] = new ScoreDoc(
+                    Integer.parseInt(resultTuple.getDocName()),
+                    (float)(resultTuple.getScore())
+            );
+        }
+        return new TopDocs(new TotalHits(nret, TotalHits.Relation.EQUAL_TO), sd);
+    }
+
     public double computeCorrelation(List<TRECQuery> queries, QPPMethod qppMethod) {
         final int qppTopK = Settings.getQppTopK();
         int numQueries = queries.size();
         double[] qppEstimates = new double[numQueries]; // stores qpp estimates for the list of input queries
         double[] evaluatedMetricValues = new double[numQueries]; // stores GTs (AP/nDCG etc.) for the list of input queries
-
         int i = 0;
+
         for (TRECQuery query : queries) {
             RetrievedResults rr = evaluator.getRetrievedResultsForQueryId(query.id);
+
             TopDocs topDocs = topDocsMap.get(query.id);
             evaluatedMetricValues[i] = evaluator.compute(query.id, Metric.AP);
             qppEstimates[i] = (float)qppMethod.computeSpecificity(

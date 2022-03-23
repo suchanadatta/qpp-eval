@@ -128,6 +128,10 @@ public class PRFSpecificityWorkflow extends NQCCalibrationWorkflow {
 
         for (TRECQuery query : queries) {
             TopDocs topDocs = topDocsMap.get(query.id);
+            /* TODO: This is only for reranking with RLM. For neural models,
+                this 'rerankedTop' has to be *loaded* from Resfile.
+                See the loadRes function (invoked from the constructor of RLSWorkFlow).
+             */
             TopDocs rerankedTop = rerankDocs(query, topDocs, topDocs.scoreDocs.length);
             TopDocs rerankedTopPostProcessed = postProcess(rerankedTop);
             postFdbkTopDocsMap.put(query.id, rerankedTopPostProcessed);
