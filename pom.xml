@@ -172,6 +172,15 @@
                 <mainClass>org.experiments.RLSWorkflow</mainClass>
             </configuration>
         </execution>
+        <execution>
+            <id>pfr_predict</id>
+            <goals>
+                <goal>java</goal>
+            </goals>
+            <configuration>
+                <mainClass>org.experiments.PRFSpecificityWorkflow</mainClass>
+            </configuration>
+        </execution>
     </executions>
     </plugin>
     </plugins>

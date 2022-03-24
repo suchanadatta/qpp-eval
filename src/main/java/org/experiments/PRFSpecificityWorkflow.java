@@ -17,16 +17,28 @@ import java.io.IOException;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.correlation.PearsonCorrelation;
 
 public class PRFSpecificityWorkflow extends NQCCalibrationWorkflow {
     PRFSpeciticity qppMethod;
-    static final float ALPHA = 0.8f;
-    static final int NUM_EXPANSION_TERMS = 10;
-    static final int NUM_FDBK_DOCS = 10;
+    float alpha;
+    int num_fdbk;
+    int num_expansion;
 
-    PRFSpecificityWorkflow(String queryFile) throws Exception {
+    PRFSpecificityWorkflow(String queryFile, float alpha, int num_fdbk, int num_expansion) throws Exception {
         super(queryFile);
-        qppMethod = new PRFSpeciticity(Settings.getSearcher(), ALPHA);
+        this.alpha = alpha;
+        this.num_fdbk = num_fdbk;
+        this.num_expansion = num_expansion;
+        qppMethod = new PRFSpeciticity(Settings.getSearcher(), alpha);
+    }
+    
+    PRFSpecificityWorkflow(String queryFile, String resFile, float alpha, int num_fdbk, int num_expansion) throws Exception {
+        super(queryFile, resFile);
+        this.alpha = alpha;
+        this.num_fdbk = num_fdbk;
+        this.num_expansion = num_expansion;
+        qppMethod = new PRFSpeciticity(Settings.getSearcher(), alpha);
     }
 
     TRECQuery expandQuery(TRECQuery q, TopDocs topDocs, int k) throws Exception {
@@ -44,7 +56,7 @@ public class PRFSpecificityWorkflow extends NQCCalibrationWorkflow {
         }
 
         // Post retrieval query expansion
-        TRECQuery expandedQuery = rlm.expandQuery(q, NUM_EXPANSION_TERMS);
+        TRECQuery expandedQuery = rlm.expandQuery(q, num_expansion);
         System.out.println("Expanded qry: " + expandedQuery.getLuceneQueryObj());
 
         return expandedQuery;
@@ -54,7 +66,7 @@ public class PRFSpecificityWorkflow extends NQCCalibrationWorkflow {
         RelevanceModelIId rlm = null;
         try {
             rlm = new RelevanceModelConditional(
-                    Settings.getSearcher(), q, topDocs, NUM_FDBK_DOCS);
+                    Settings.getSearcher(), q, topDocs, num_fdbk);
             rlm.computeFdbkWeights();
         }
         catch (IOException ioex) { ioex.printStackTrace(); } catch (Exception ex) {
@@ -159,15 +171,22 @@ public class PRFSpecificityWorkflow extends NQCCalibrationWorkflow {
 
         double corr = new KendalCorrelation().correlation(evaluatedMetricValues, qppEstimates);
         System.out.println(String.format("Kendall's = %.4f", corr));
+        
+//        double corr = new PearsonCorrelation().correlation(evaluatedMetricValues, qppEstimates);
+//        System.out.println(String.format("Pearson's = %.4f", corr));
+        
         return corr;
     }
 
     public static void main(String[] args) {
-        final String queryFile = "data/topics.401-450.xml";
-        Settings.init("trec8.properties");
+        final String queryFile = "/home/suchana/NetBeansProjects/qpp-variation/data/topics.401-450.xml";
+        final float ALPHA = 0.3f;
+        final int NUM_FDBK_TOP_DOCS = 10;
+        final int NUM_EXPANSION = 5; 
+        Settings.init("qpp.properties");
 
         try {
-            PRFSpecificityWorkflow prfSpecificityWorkflow = new PRFSpecificityWorkflow(queryFile);
+            PRFSpecificityWorkflow prfSpecificityWorkflow = new PRFSpecificityWorkflow(queryFile, ALPHA, NUM_FDBK_TOP_DOCS, NUM_EXPANSION);
             System.out.println(String.format("Evaluating on %d queries", prfSpecificityWorkflow.queries.size()));
             //prfSpecificityWorkflow.computeCorrelationWithExpandedQueries(prfSpecificityWorkflow.queries);
             prfSpecificityWorkflow.computeCorrelationWithoutExpandedQueries(prfSpecificityWorkflow.queries);
