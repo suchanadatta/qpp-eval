@@ -19,6 +19,7 @@ import java.io.File;
 import java.util.*;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import org.correlation.PearsonCorrelation;
 
 class TrainTestInfo {
     List<TRECQuery> train;
@@ -70,6 +71,7 @@ public class NQCCalibrationWorkflow {
                 Settings.getCorrelationMetric(), Settings.getSearcher(), Settings.getNumWanted());
         queries = qppEvaluator.constructQueries(queryFile);
         topDocsMap = loadResFile(new File(resFile));
+        System.out.println("#### : " + topDocsMap.size());
         evaluator = qppEvaluator.executeDummy(queries, sim,
                 Settings.getNumWanted(), Settings.getQrelsFile(),
                 Settings.RES_FILE, topDocsMap);
@@ -125,8 +127,8 @@ public class NQCCalibrationWorkflow {
         int i = 0;
         for (ResultTuple resultTuple: rr.getTuples()) {
             sd[i++] = new ScoreDoc(
-                    Integer.parseInt(resultTuple.getDocName()),
-                    (float)(resultTuple.getScore())
+                Integer.parseInt(resultTuple.getDocName()),
+                (float)(resultTuple.getScore())
             );
         }
         return new TopDocs(new TotalHits(nret, TotalHits.Relation.EQUAL_TO), sd);
@@ -140,8 +142,8 @@ public class NQCCalibrationWorkflow {
         int i = 0;
 
         for (TRECQuery query : queries) {
-            RetrievedResults rr = evaluator.getRetrievedResultsForQueryId(query.id);
-
+//            RetrievedResults rr = evaluator.getRetrievedResultsForQueryId(query.id);
+            RetrievedResults rr = null;
             TopDocs topDocs = topDocsMap.get(query.id);
             evaluatedMetricValues[i] = evaluator.compute(query.id, Metric.AP);
             qppEstimates[i] = (float)qppMethod.computeSpecificity(
@@ -149,11 +151,15 @@ public class NQCCalibrationWorkflow {
             i++;
         }
 
-        double corr = new KendalCorrelation().correlation(evaluatedMetricValues, qppEstimates);
-        System.out.println(String.format("Kendall's = %.4f", corr));
+//        double corr = new KendalCorrelation().correlation(evaluatedMetricValues, qppEstimates);
+//        System.out.println(String.format("Kendall's = %.4f", corr));
+//        
+        double corr = new PearsonCorrelation().correlation(evaluatedMetricValues, qppEstimates);
+        System.out.println(String.format("Pearson's = %.4f", corr));
+        
         return corr;
     }
-
+    
     public float[] calibrateParams(List<TRECQuery> trainQueries) {
         final int qppTopK = Settings.getQppTopK();
         final float[] alpha_choices = {/*0.25f, 0.5f, 1.0f,*/ 1.5f, /*2.0f*/};
@@ -203,7 +209,7 @@ public class NQCCalibrationWorkflow {
 
     public static void main(String[] args) {
         final String queryFile = "data/topics.robust.all";
-        Settings.init("init.properties");
+        Settings.init("qpp.properties");
 
         try {
             NQCCalibrationWorkflow nqcCalibrationWorkflow = new NQCCalibrationWorkflow(queryFile);

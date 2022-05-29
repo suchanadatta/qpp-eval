@@ -9,7 +9,6 @@ import org.experiments.Settings;
 import org.feedback.RelevanceModelConditional;
 import org.feedback.RelevanceModelIId;
 import org.feedback.RetrievedDocTermInfo;
-import org.feedback.RetrievedDocsTermStats;
 import org.trec.TRECQuery;
 import org.evaluator.Evaluator;
 
@@ -98,8 +97,6 @@ public class RLSSpecificity implements QPPMethod {
 
     List<Query> generateAugmentedQueries(TRECQuery q, TopDocs topDocs) throws Exception {
         Set<RetrievedDocTermInfo> topTermWts = topFdbkTerms(q, topDocs); // NUM_SAMPLES feedback terms
-        //topTermWts.stream().forEach(System.out::println);
-
         List<Query> augmented_queries = new ArrayList<>();
         /* for each feedback term */
         for (RetrievedDocTermInfo termInfo: topTermWts) {
@@ -113,7 +110,7 @@ public class RLSSpecificity implements QPPMethod {
     /* create a list of reference queries */
     List<QueryAndTopDocs> getReferenceLists(Query q, TopDocs topDocs, int numWanted) throws Exception {
         List<Query> augmented_queries = generateAugmentedQueries(new TRECQuery(q), topDocs);
-        //augmented_queries.stream().forEach(System.out::println);
+        augmented_queries.stream().forEach(System.out::println);
 
         /* list of augmented <query + topdocs> objects */
         List<QueryAndTopDocs> refLists = new ArrayList<>();
@@ -138,11 +135,8 @@ public class RLSSpecificity implements QPPMethod {
     double compareSpecificities(Query orig_query, TopDocs orig_q_topDocs,
                                  Query augmented_query, TopDocs augmented_q_topDocs) {
         double nqc_orig_query = nqcSpecificity.computeNQC(orig_query, orig_q_topDocs, Settings.getQppTopK());
-//        System.out.println("$$$$$$$ : " + nqc_orig_query);
         double nqc_augmented_query = nqcSpecificity.computeNQC(augmented_query, augmented_q_topDocs, Settings.getQppTopK());
-//        System.out.println("&&&&&&& : " + nqc_augmented_query);
         int sign = nqc_augmented_query > nqc_orig_query? 1 : -1;
-//        System.out.println("Sign : " + sign);
         return nqc_augmented_query*sign;
     }
 
@@ -192,10 +186,10 @@ public class RLSSpecificity implements QPPMethod {
                     numPos++;
             }
             else {
-                System.out.println("Discarding ranked list for query " + aug_query);
+//                System.out.println("Discarding ranked list for query " + aug_query); // debug ref lists
             }
         }
-        System.out.println(String.format("#pos = %d, #neg = %d", numPos, queryAndTopDocsList.size() - numPos));
+//        System.out.println(String.format("#pos = %d, #neg = %d", numPos, queryAndTopDocsList.size() - numPos));
         //System.out.println(String.format("Max p: %.6f", p_values.stream().mapToDouble(x->x).max().getAsDouble()));
         return queryAndTopDocsList;
     }
@@ -211,8 +205,6 @@ public class RLSSpecificity implements QPPMethod {
         try {
             refLists = getReferenceLists(q, topDocs, topDocs.scoreDocs.length);
             polarizedRefLists = filterAndPolarize(q, topDocs, refLists);
-//            System.out.println("****** : " + polarizedRefLists.size());
-
             for (QueryAndTopDocs queryAndTopDocs: polarizedRefLists) {
                 sim = OverlapStats.computeRBO(topDocs, queryAndTopDocs.topDocs, k, p);
                 if (!queryAndTopDocs.pos)
