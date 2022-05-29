@@ -41,13 +41,22 @@ class TrainTestInfo {
 
 public class NQCCalibrationWorkflow {
     Similarity sim = new LMDirichletSimilarity(1000);
-    Map<String, TopDocs> topDocsMap = new HashMap<>();
-    QPPEvaluator qppEvaluator;
-    Evaluator evaluator;
-    QPPMethod qppMethod;
-    List<TRECQuery> queries;
+    protected Map<String, TopDocs> topDocsMap = new HashMap<>();
+    protected QPPEvaluator qppEvaluator;
+    protected Evaluator evaluator;
+    protected QPPMethod qppMethod;
+    protected List<TRECQuery> queries;
 
-    NQCCalibrationWorkflow(String queryFile) throws Exception {
+    public NQCCalibrationWorkflow() throws Exception {
+        qppEvaluator = new QPPEvaluator(
+                Settings.getProp(),
+                Settings.getCorrelationMetric(), Settings.getSearcher(), Settings.getNumWanted());
+        queries = qppEvaluator.constructQueries(Settings.getQueryFile());
+        evaluator = qppEvaluator.executeQueries(queries, sim, Settings.getNumWanted(),
+                Settings.getQrelsFile(), Settings.RES_FILE, topDocsMap);
+    }
+
+    public NQCCalibrationWorkflow(String queryFile) throws Exception {
         qppEvaluator = new QPPEvaluator(
                 Settings.getProp(),
                 Settings.getCorrelationMetric(), Settings.getSearcher(), Settings.getNumWanted());
@@ -55,7 +64,7 @@ public class NQCCalibrationWorkflow {
         evaluator = qppEvaluator.executeQueries(queries, sim, Settings.getNumWanted(), Settings.getQrelsFile(), Settings.RES_FILE, topDocsMap);
     }
 
-    NQCCalibrationWorkflow(String queryFile, String resFile) throws Exception {
+    public NQCCalibrationWorkflow(String queryFile, String resFile) throws Exception {
         qppEvaluator = new QPPEvaluator(
                 Settings.getProp(),
                 Settings.getCorrelationMetric(), Settings.getSearcher(), Settings.getNumWanted());

@@ -17,6 +17,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.correlation.*;
 import org.evaluator.Metric;
 import org.qpp.*;
+import org.trec.FieldConstants;
 
 
 public class Settings {
@@ -42,7 +43,7 @@ public class Settings {
         return prop.getProperty("qrels.file");
     }
 
-    static void init(String propFile) {
+    static public void init(String propFile) {
         if (initialized)
             return;
 
@@ -124,5 +125,13 @@ public class Settings {
 
     public static Metric getRetEvalMetric() {
         return retEvalMetrics.get(prop.getProperty("reteval.metric"));
+    }
+
+    public static String getDocIdFromOffset(int docOffset) {
+        try {
+            return reader.document(docOffset).get(FieldConstants.FIELD_ID);
+        }
+        catch (Exception ex) { ex.printStackTrace(); }
+        return null;
     }
 }

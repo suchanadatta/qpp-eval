@@ -169,6 +169,30 @@ public class QPPEvaluator {
     }
 
     public Evaluator executeQueries(List<TRECQuery> queries, Similarity sim,
+                                    int cutoff, String qrelsFile, String resFile,
+                                    Map<String, TopDocs> topDocsMap,
+                                    Map<String, Integer> maxDepths) throws Exception {
+        int numQueries = queries.size();
+        double[] evaluatedMetricValues = new double[numQueries];
+
+        FileWriter fw = new FileWriter(resFile);
+        BufferedWriter bw = new BufferedWriter(fw);
+
+        for (TRECQuery query : queries) {
+            TopDocs topDocs = retrieve(query, sim, cutoff);
+            if (topDocsMap != null)
+                topDocsMap.put(query.id, topDocs);
+            saveRetrievedTuples(bw, query, topDocs, sim.toString());
+        }
+        bw.flush();
+        bw.close();
+        fw.close();
+
+        Evaluator evaluator = new Evaluator(qrelsFile, resFile); // load ret and rel
+        return evaluator;
+    }
+
+    public Evaluator executeQueries(List<TRECQuery> queries, Similarity sim,
                                     int cutoff, String qrelsFile, String resFile, 
                                     Map<String, TopDocs> topDocsMap) throws Exception {
 

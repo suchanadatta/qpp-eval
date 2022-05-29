@@ -51,6 +51,8 @@ public class TRECQuery {
     }
 
     public Query getLuceneQueryObj() { return luceneQuery; }
+
+    public void setLuceneQueryObj(Query luceneQuery) { this.luceneQuery = luceneQuery; }
     
     public Set<Term> getQueryTerms(IndexSearcher searcher) throws IOException {
         Set<Term> terms = new HashSet<>();

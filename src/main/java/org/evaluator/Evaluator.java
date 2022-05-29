@@ -4,12 +4,13 @@
  */
 package org.evaluator;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
-import java.util.TreeMap;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TopDocs;
+import org.experiments.Settings;
+import org.pooling.IRSystem;
+import java.io.*;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -18,57 +19,108 @@ import java.util.TreeMap;
 
 class PerQueryRelDocs {
     String qid;
-    HashMap<String, Integer> relMap; // keyed by docid, entry stores the rel value
-    int numRel;
-    
+    Map<String, Integer> relMap; // keyed by docid, entry stores the rel value
+
     public PerQueryRelDocs(String qid) {
         this.qid = qid;
-        numRel = 0;
         relMap = new HashMap<>();
     }
-    
+
     void addTuple(String docId, int rel) {
         if (relMap.get(docId) != null)
             return;
         if (rel > 0) {
-            numRel++;
             relMap.put(docId, rel);
         }
-    }    
+    }
 }
 
 class AllRelRcds {
     String qrelsFile;
-    HashMap<String, PerQueryRelDocs> perQueryRels;
+    Map<String, PerQueryRelDocs> perQueryRels;
     int totalNumRel;
+    List<IRSystem> systems;
+    Map<String, Boolean> inducedRel;    // a map from docid to a boolean
+                                        // which is true if each system retrieves this doc
+                                        // at rank < depth for that query
 
     public AllRelRcds(String qrelsFile) {
         this.qrelsFile = qrelsFile;
         perQueryRels = new HashMap<>();
         totalNumRel = 0;
+        load();
     }
-    
+
+    public AllRelRcds(String qrelsFile, List<IRSystem> systems) {
+        this.qrelsFile = qrelsFile;
+        this.systems = systems;
+        perQueryRels = new HashMap<>();
+        totalNumRel = 0;
+        load();
+    }
+
     int getTotalNumRel() {
         if (totalNumRel > 0)
             return totalNumRel;
         
         for (Map.Entry<String, PerQueryRelDocs> e : perQueryRels.entrySet()) {
             PerQueryRelDocs perQryRelDocs = e.getValue();
-            totalNumRel += perQryRelDocs.numRel;
+            totalNumRel += perQryRelDocs.relMap.size();
         }
         return totalNumRel;
     }
-    
-    void load() throws Exception {
-        FileReader fr = new FileReader(qrelsFile);
-        BufferedReader br = new BufferedReader(fr);
-        String line;
-        
-        while ((line = br.readLine()) != null) {
-            storeRelRcd(line);
+
+    void filter(IRSystem system, String qid) {
+        TopDocs topDocs = system.getTopDocs(qid);
+        int depth = system.getDepth(qid);
+
+        for (int i=0; i < depth; i++) {
+            ScoreDoc sd = topDocs.scoreDocs[i];
+            String docId = Settings.getDocIdFromOffset(sd.doc);
+            Boolean rel = inducedRel.get(docId);
+            if (rel==null)
+                continue;
+            inducedRel.put(docId, true);
         }
-        br.close();
-        fr.close();
+    }
+
+    private void load() {
+        try {
+            FileReader fr = new FileReader(qrelsFile);
+            BufferedReader br = new BufferedReader(fr);
+            String line;
+
+            while ((line = br.readLine()) != null) {
+                storeRelRcd(line);
+            }
+            br.close();
+            fr.close();
+
+            // filter out the relevant documents that appear beyond the depth cut-off
+            if (systems != null) {
+                // init every rel doc to true
+                for (String qid : this.perQueryRels.keySet()) {
+                    PerQueryRelDocs perQueryRelDocs = perQueryRels.get(qid);
+                    inducedRel = perQueryRelDocs.relMap.keySet().stream().collect(Collectors.toMap(x -> x, x -> false));
+                    for (IRSystem system : systems) {
+                        filter(system, qid);
+                    }
+
+                    // Now leave out the ones whose indicator is false...
+                    Set<String> filteredRelDocs =
+                            inducedRel.entrySet().stream()
+                                    .filter(e -> e.getValue() == true)
+                                    .map(e -> e.getKey()).collect(Collectors.toSet());
+
+                    Map<String, Integer> newRelMap = new HashMap<>();
+                    for (String docId : filteredRelDocs) {
+                        newRelMap.put(docId, perQueryRelDocs.relMap.get(docId));
+                    }
+                    perQueryRelDocs.relMap = newRelMap;
+                }
+            }
+        }
+        catch (Exception ex) { ex.printStackTrace(); }
     }
     
     void storeRelRcd(String line) {
@@ -108,12 +160,10 @@ class AllRetrievedResults {
     AllRelRcds allRelInfo;
     
     public AllRetrievedResults(String resFile) {
-        this.resFile = resFile;
-        allRetMap = new TreeMap<>();
-    }
-
-    public void load() {
         String line;
+        this.resFile = resFile;
+
+        allRetMap = new TreeMap<>();
         try (FileReader fr = new FileReader(resFile);
              BufferedReader br = new BufferedReader(fr); ) {
             while ((line = br.readLine()) != null) {
@@ -121,6 +171,16 @@ class AllRetrievedResults {
             }
         }
         catch (Exception ex) { ex.printStackTrace(); }
+    }
+
+    public AllRetrievedResults(String qid, TopDocs topDocs) {
+        allRetMap = new TreeMap<>();
+        RetrievedResults rr = new RetrievedResults(qid);
+        int rank = 1;
+        for (ScoreDoc sd: topDocs.scoreDocs) {
+            rr.addTuple(Settings.getDocIdFromOffset(sd.doc), rank++, sd.score);
+        }
+        allRetMap.put(qid, rr);
     }
 
     public RetrievedResults getRetrievedResultsForQueryId(String qid) {
@@ -201,16 +261,13 @@ public class Evaluator {
     public Evaluator(String qrelsFile, String resFile) {
         relRcds = new AllRelRcds(qrelsFile);
         retRcds = new AllRetrievedResults(resFile);
-
-        try {
-            load();
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-        }
         fillRelInfo();
     }
-    
+
+    public Evaluator(String qrelsFile, List<IRSystem> systems) {
+        relRcds = new AllRelRcds(qrelsFile, systems);
+    }
+
     public Evaluator(Properties prop) {
         this(prop.getProperty("qrels.file"),
             prop.getProperty("res.file")
@@ -221,11 +278,6 @@ public class Evaluator {
         return retRcds.getRetrievedResultsForQueryId(qid);
     }
 
-    private void load() throws Exception {
-        relRcds.load();
-        retRcds.load();
-    }
-    
     private void fillRelInfo() {
         retRcds.fillRelInfo(relRcds);
     }
@@ -237,7 +289,14 @@ public class Evaluator {
     public double compute(String qid, Metric m) {
         return retRcds.compute(qid, m);
     }
-    
+
+    public double compute(String qid, IRSystem system, Metric m) {
+        // load retrieved tuples from memory instead of loading from file
+        retRcds = new AllRetrievedResults(qid, system.getTopDocs(qid));
+        retRcds.fillRelInfo(this.relRcds);
+        return retRcds.compute(qid, m);
+    }
+
     @Override
     public String toString() {
         StringBuffer buff = new StringBuffer();

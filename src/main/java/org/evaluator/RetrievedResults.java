@@ -66,7 +66,7 @@ public class RetrievedResults implements Comparable<RetrievedResults> {
             return avgP;
 
         float prec = 0;
-        int numRel = relInfo.numRel;
+        int numRel = relInfo.relMap.size();
         int numRelSeen = 0;
         for (ResultTuple tuple : this.rtuples) {
             if (tuple.rel < 1)
@@ -104,7 +104,7 @@ public class RetrievedResults implements Comparable<RetrievedResults> {
             numRelSeen++;
         }
         numRelRet = numRelSeen;
-        return numRelSeen/(float)relInfo.numRel;
+        return numRelSeen/(float)relInfo.relMap.size();
     }
     
     float computeNdcg() {

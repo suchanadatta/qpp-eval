@@ -50,7 +50,7 @@ public class PRFSpecificityWorkflow extends NQCCalibrationWorkflow {
         return expandedQuery;
     }
 
-    TopDocs rerankDocs(TRECQuery q, TopDocs topDocs, int k) throws Exception {
+    static public TopDocs rerankDocs(TRECQuery q, TopDocs topDocs, int k) throws Exception {
         RelevanceModelIId rlm = null;
         try {
             rlm = new RelevanceModelConditional(
