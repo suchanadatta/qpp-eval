@@ -1,12 +1,10 @@
 package org.experiments;
 
-import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.correlation.KendalCorrelation;
 import org.evaluator.Evaluator;
 import org.evaluator.Metric;
-import org.evaluator.RetrievedResults;
 import org.feedback.RelevanceModelConditional;
 import org.feedback.RelevanceModelIId;
 import org.qpp.PRFSpeciticity;
@@ -17,7 +15,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.correlation.PearsonCorrelation;
 
 public class PRFSpecificityWorkflow extends NQCCalibrationWorkflow {
     PRFSpeciticity qppMethod;
@@ -65,8 +62,7 @@ public class PRFSpecificityWorkflow extends NQCCalibrationWorkflow {
     static public TopDocs rerankDocs(TRECQuery q, TopDocs topDocs, int k) throws Exception {
         RelevanceModelIId rlm = null;
         try {
-            rlm = new RelevanceModelConditional(
-                    Settings.getSearcher(), q, topDocs, num_fdbk);
+            rlm = new RelevanceModelConditional(Settings.getSearcher(), q, topDocs, Settings.getQppTopK());
             rlm.computeFdbkWeights();
         }
         catch (IOException ioex) { ioex.printStackTrace(); } catch (Exception ex) {

@@ -11,8 +11,8 @@ import java.util.stream.Collectors;
 public class OverlapStats {
 
     static double overlap(int[] docIdsA, int[] docIdsB, int depth) {
-        Set<Integer> docSetA = Arrays.stream(docIdsA).boxed().collect(Collectors.toSet());
-        Set<Integer> docSetB = Arrays.stream(docIdsB).boxed().collect(Collectors.toSet());
+        Set<Integer> docSetA = Arrays.stream(docIdsA).boxed().limit(depth).collect(Collectors.toSet());
+        Set<Integer> docSetB = Arrays.stream(docIdsB).boxed().limit(depth).collect(Collectors.toSet());
         Set<Integer> overlap = new HashSet<>(docSetA);
         overlap.retainAll(docSetB);
         return overlap.size()/(double)depth;
